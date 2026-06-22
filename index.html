@@ -1,12 +1,377 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>project name</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>시간의 길, 이야기의 판</title>
+
+  <!-- CSS 연결 -->
+  <link rel="stylesheet" href="./css/theme.css" />
+  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="stylesheet" href="./css/responsive.css" />
 </head>
+
 <body>
-    <h1>웹 화면에 표시될 내용</h1>
-    <p>여기에 본문 내용을 작성합니다.</p>
+  <!-- 상단 헤더 -->
+  <header class="site-header">
+    <div class="logo-area" data-page="home">
+      <div class="logo-mark">文</div>
+
+      <div class="logo-text">
+        <h1>시간의 길, 이야기의 판</h1>
+        <p>한국 전통 문화 인터랙티브 웹 플랫폼</p>
+      </div>
+    </div>
+
+    <nav class="main-nav">
+      <button class="nav-btn active" data-page="home">메인</button>
+      <button class="nav-btn" data-page="history">역사</button>
+      <button class="nav-btn" data-page="game">놀이</button>
+      <button class="nav-btn" data-page="myth">설화, 신화</button>
+    </nav>
+
+    <button class="ai-open-btn" id="open-ai-btn">AI 질문</button>
+  </header>
+
+  <!-- 전체 페이지 영역 -->
+  <main class="main-container">
+    <!-- 메인 페이지 -->
+    <section id="home-page" class="page active">
+      <div class="hero-section">
+        <div class="hero-text">
+          <span class="section-badge">Korean Traditional Culture</span>
+
+          <h2>지도, 이야기, 놀이로 만나는 한국 전통 문화</h2>
+
+          <p>
+            역사적 사건은 지도 위에서 움직이고, 설화와 신화는 2D 장면으로 펼쳐지며,
+            전통 놀이는 온라인 보드게임으로 다시 살아납니다.
+          </p>
+
+          <div class="hero-actions">
+            <button class="primary-btn" data-page="history">역사 탐험하기</button>
+            <button class="secondary-btn" data-page="game">놀이 시작하기</button>
+          </div>
+        </div>
+
+        <div class="hero-map-card">
+          <div class="map-preview">
+            <div class="map-shape"></div>
+            <div class="route-line"></div>
+
+            <button class="marker marker-red">人</button>
+            <button class="marker marker-blue">人</button>
+            <button class="marker marker-green">人</button>
+          </div>
+
+          <div class="preview-card">
+            <h3>1592년 · 한산도 대첩</h3>
+            <p>
+              인물 아이콘을 클릭하면 사건 정보와 2D 장면을 볼 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card" data-page="history">
+          <h3>역사</h3>
+          <p>
+            연표 순서에 따라 지도 위 인물들이 이동하고,
+            사건별 설명과 2D 장면을 제공합니다.
+          </p>
+        </article>
+
+        <article class="feature-card" data-page="game">
+          <h3>놀이</h3>
+          <p>
+            승경도와 승람도를 온라인으로 즐기며,
+            친구들과 방을 만들어 함께 플레이합니다.
+          </p>
+        </article>
+
+        <article class="feature-card" data-page="myth">
+          <h3>설화, 신화</h3>
+          <p>
+            요괴, 신수, 영수, 야사, 이름 유래를
+            인터랙티브하게 탐색합니다.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <!-- 역사 페이지 -->
+    <section id="history-page" class="page">
+      <div class="page-title">
+        <span class="section-badge">History Map</span>
+        <h2>역사</h2>
+        <p>
+          사건 혹은 시간대별로 지도에서 사람들이 움직이고,
+          아이콘을 클릭하면 자세한 정보가 표시됩니다.
+        </p>
+      </div>
+
+      <div class="history-layout">
+        <section class="map-panel">
+          <h3>인터랙티브 역사 지도</h3>
+
+          <div class="history-map" id="history-map">
+            <div class="map-shape large"></div>
+            <div class="history-route"></div>
+
+            <button class="person-icon person-1" data-event-id="1">人</button>
+            <button class="person-icon person-2" data-event-id="2">人</button>
+            <button class="person-icon person-3" data-event-id="3">人</button>
+          </div>
+
+          <div class="timeline">
+            <span>삼국</span>
+            <input
+              type="range"
+              id="history-timeline"
+              min="0"
+              max="3"
+              value="1"
+            />
+            <span>현대</span>
+          </div>
+
+          <div class="timeline-years">
+            <span>057년</span>
+            <span>1392년</span>
+            <span>1592년</span>
+            <span>1919년</span>
+          </div>
+        </section>
+
+        <aside class="info-panel">
+          <h3>상세 정보</h3>
+
+          <div id="history-info">
+            <p>
+              지도 위 인물 아이콘을 클릭하면 이곳에 사건 정보가 표시됩니다.
+            </p>
+          </div>
+
+          <button class="primary-btn" id="open-history-scene-btn">
+            2D 장면 보기
+          </button>
+        </aside>
+
+        <section class="scene-panel">
+          <h3>역사 2D 장면</h3>
+
+          <canvas id="history-scene-canvas" width="500" height="280"></canvas>
+
+          <div class="scene-description" id="history-scene-description">
+            <p>
+              특정 사건을 선택하면 전투, 행렬, 회의, 민중 운동 등의 장면이
+              2D 씬으로 표시됩니다.
+            </p>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- 놀이 페이지 -->
+    <section id="game-page" class="page">
+      <div class="page-title">
+        <span class="section-badge">Traditional Board Game</span>
+        <h2>놀이</h2>
+        <p>
+          승경도와 승람도를 2트랙으로 제공하고,
+          온라인 방을 만들어 친구들과 함께 플레이합니다.
+        </p>
+      </div>
+
+      <div class="game-mode-grid">
+        <article class="game-mode-card active" data-game-type="seunggyeongdo">
+          <h3>승경도</h3>
+          <p>
+            국가나 시대를 선택하면 그 시대의 관직제도에 맞춰
+            보드 칸 이름이 바뀝니다.
+          </p>
+
+          <label for="era-select">시대 선택</label>
+          <select id="era-select">
+            <option value="joseon">조선</option>
+            <option value="goryeo">고려</option>
+            <option value="silla">신라</option>
+          </select>
+        </article>
+
+        <article class="game-mode-card" data-game-type="seungramdo">
+          <h3>승람도</h3>
+          <p>
+            지명이나 명소를 바탕으로 플레이하고,
+            지역 한 칸마다 자세한 정보를 볼 수 있습니다.
+          </p>
+
+          <label for="region-select">지역 선택</label>
+          <select id="region-select">
+            <option value="gyeongju">경주</option>
+            <option value="jeonju">전주</option>
+            <option value="seoul">한양</option>
+            <option value="tongyeong">통영</option>
+          </select>
+        </article>
+      </div>
+
+      <div class="online-room-panel">
+        <div>
+          <h3>온라인 방</h3>
+          <p>친구들과 모여 방을 만들고 같은 보드에서 플레이할 수 있습니다.</p>
+        </div>
+
+        <div class="room-actions">
+          <input
+            type="text"
+            id="nickname-input"
+            placeholder="닉네임 입력"
+          />
+
+          <button class="primary-btn" id="create-room-btn">방 만들기</button>
+
+          <input
+            type="text"
+            id="room-code-input"
+            placeholder="방 코드 입력"
+          />
+
+          <button class="secondary-btn" id="join-room-btn">입장하기</button>
+        </div>
+      </div>
+
+      <div class="game-layout">
+        <section class="board-panel">
+          <h3>보드판</h3>
+
+          <div id="game-board" class="game-board">
+            <div class="board-cell">출발</div>
+            <div class="board-cell">한성</div>
+            <div class="board-cell">참봉</div>
+            <div class="board-cell">정랑</div>
+            <div class="board-cell">판서</div>
+            <div class="board-cell">관찰사</div>
+            <div class="board-cell">좌의정</div>
+            <div class="board-cell">영의정</div>
+          </div>
+
+          <button class="primary-btn" id="roll-dice-btn">주사위 굴리기</button>
+        </section>
+
+        <aside class="game-info-panel">
+          <h3>게임 정보</h3>
+
+          <div id="game-status">
+            <p>현재 모드: 승경도</p>
+            <p>주사위 값: -</p>
+            <p>현재 위치: 출발</p>
+          </div>
+
+          <div id="room-list">
+            <h4>방 목록</h4>
+            <p>생성된 방이 이곳에 표시됩니다.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 설화, 신화 페이지 -->
+    <section id="myth-page" class="page">
+      <div class="page-title">
+        <span class="section-badge">Myth & Folktale</span>
+        <h2>설화, 신화</h2>
+        <p>
+          요괴, 신수, 영수, 신 이름 유래, 사람 이름 유래, 야사를
+          인터랙티브하게 탐색합니다.
+        </p>
+      </div>
+
+      <div class="myth-layout">
+        <aside class="myth-category-panel">
+          <h3>정보 분류</h3>
+
+          <button class="category-btn active" data-category="all">전체</button>
+          <button class="category-btn" data-category="요괴">요괴</button>
+          <button class="category-btn" data-category="신수">신수</button>
+          <button class="category-btn" data-category="영수">영수</button>
+          <button class="category-btn" data-category="신화">신화</button>
+          <button class="category-btn" data-category="야사">야사</button>
+        </aside>
+
+        <section class="myth-content-panel">
+          <div class="search-area">
+            <input
+              type="text"
+              id="myth-search-input"
+              placeholder="구미호, 해태, 단군 신화 등을 검색하세요"
+            />
+
+            <button class="secondary-btn" id="myth-search-btn">검색</button>
+          </div>
+
+          <div id="myth-card-list" class="myth-card-list">
+            <article class="myth-card">
+              <h3>구미호</h3>
+              <p>아홉 개의 꼬리를 가진 여우 요괴입니다.</p>
+              <button class="text-btn" data-scene-key="gumiho">2D 장면 보기</button>
+            </article>
+
+            <article class="myth-card">
+              <h3>해태</h3>
+              <p>옳고 그름을 판단한다고 여겨진 상상의 동물입니다.</p>
+              <button class="text-btn" data-scene-key="haetae">2D 장면 보기</button>
+            </article>
+
+            <article class="myth-card">
+              <h3>단군 신화</h3>
+              <p>고조선 건국과 관련된 대표적인 건국 신화입니다.</p>
+              <button class="text-btn" data-scene-key="dangun">2D 장면 보기</button>
+            </article>
+          </div>
+        </section>
+
+        <section class="myth-scene-panel">
+          <h3>설화 2D 장면</h3>
+
+          <canvas id="myth-scene-canvas" width="500" height="280"></canvas>
+
+          <div id="myth-scene-description" class="scene-description">
+            <p>
+              설화나 신화를 선택하면 이곳에 2D 장면과 설명창이 표시됩니다.
+            </p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <!-- AI 질문 패널 -->
+  <aside class="ai-panel" id="ai-panel">
+    <div class="ai-panel-header">
+      <h3>AI 문화 탐색 도우미</h3>
+      <button id="close-ai-btn">닫기</button>
+    </div>
+
+    <div class="ai-messages" id="ai-messages">
+      <p class="ai-message">
+        궁금한 역사 사건, 설화, 신화, 보드게임 규칙을 질문해보세요.
+      </p>
+    </div>
+
+    <div class="ai-input-area">
+      <input
+        type="text"
+        id="ai-question-input"
+        placeholder="예: 구미호가 뭐야?"
+      />
+      <button id="ai-send-btn">질문</button>
+    </div>
+  </aside>
+
+  <!-- JS 연결 -->
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
