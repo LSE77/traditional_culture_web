@@ -1,30 +1,46 @@
 export function initRouter() {
-  const navButtons = document.querySelectorAll("[data-page]");
+  const pageButtons = document.querySelectorAll("[data-page]");
   const pages = document.querySelectorAll(".page");
+  const navButtons = document.querySelectorAll(".nav-btn");
 
-  navButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const targetPage = button.dataset.page;
+  function moveToPage(pageName) {
+    console.log("이동할 페이지:", pageName);
 
-      if (!targetPage) return;
+    pages.forEach((page) => {
+      page.classList.remove("active");
+      page.style.display = "none";
+    });
 
-      pages.forEach((page) => {
-        page.classList.remove("active");
-      });
+    const targetPage = document.getElementById(`${pageName}-page`);
 
-      const selectedPage = document.getElementById(`${targetPage}-page`);
+    if (!targetPage) {
+      console.error(`페이지를 찾을 수 없습니다: ${pageName}-page`);
+      return;
+    }
 
-      if (selectedPage) {
-        selectedPage.classList.add("active");
-      }
+    targetPage.classList.add("active");
+    targetPage.style.display = "block";
 
-      document.querySelectorAll(".nav-btn").forEach((navBtn) => {
-        navBtn.classList.remove("active");
-      });
+    navButtons.forEach((button) => {
+      button.classList.remove("active");
 
-      if (button.classList.contains("nav-btn")) {
+      if (button.dataset.page === pageName) {
         button.classList.add("active");
       }
     });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  pageButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const pageName = button.dataset.page;
+      moveToPage(pageName);
+    });
   });
+
+  moveToPage("home");
 }

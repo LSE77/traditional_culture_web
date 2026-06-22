@@ -3,6 +3,7 @@ import { supabase } from "./supabaseClient.js";
 let historyEvents = [];
 let currentZoom = 1;
 let currentEraIndex = 1;
+
 let isDragging = false;
 let startX = 0;
 let startY = 0;
@@ -13,23 +14,27 @@ const eraList = [
   {
     name: "삼국 시대",
     year: "057년 ~ 935년",
-    situation: "고구려, 백제, 신라가 각 지역을 중심으로 성장하던 시기입니다."
+    situation:
+      "고구려, 백제, 신라가 각 지역을 중심으로 성장하며 전쟁과 교류를 반복하던 시기입니다.",
   },
   {
     name: "조선 전기",
     year: "1392년 ~ 1592년",
-    situation: "한양을 중심으로 국가 체제가 정비되고 문화와 제도가 발전하던 시기입니다."
+    situation:
+      "한양을 중심으로 조선의 정치 제도와 관료 체계가 정비되고 문화가 발전하던 시기입니다.",
   },
   {
     name: "조선 후기",
     year: "1592년 ~ 1897년",
-    situation: "임진왜란, 병자호란 이후 사회 변화와 실학, 상업 발달이 나타난 시기입니다."
+    situation:
+      "임진왜란과 병자호란 이후 사회 변화가 커지고, 실학과 상업이 발달하던 시기입니다.",
   },
   {
     name: "근현대",
     year: "1897년 ~ 1945년",
-    situation: "대한제국, 일제강점기, 독립운동 등 큰 변화가 일어난 시기입니다."
-  }
+    situation:
+      "대한제국, 일제강점기, 독립운동 등 한반도의 정치적 변화가 크게 일어난 시기입니다.",
+  },
 ];
 
 const fallbackEvents = [
@@ -38,40 +43,44 @@ const fallbackEvents = [
     title: "세종 즉위",
     year: 1418,
     region: "한양",
-    description: "조선 제4대 왕 세종이 즉위하여 정치, 과학, 문화 발전의 기반을 마련하였다.",
-    x: 46,
-    y: 32,
-    scene_key: "sejong"
+    description:
+      "조선 제4대 왕 세종이 즉위하여 정치, 과학, 문화 발전의 기반을 마련한 사건입니다.",
+    x: 52,
+    y: 36,
+    scene_key: "sejong",
   },
   {
     id: 2,
     title: "한산도 대첩",
     year: 1592,
     region: "경상남도 통영",
-    description: "이순신 장군이 학익진 전술로 일본 수군을 크게 물리친 전투이다.",
-    x: 58,
-    y: 74,
-    scene_key: "hansando"
+    description:
+      "이순신 장군이 학익진 전술로 일본 수군을 크게 물리친 임진왜란의 대표적인 해전입니다.",
+    x: 56,
+    y: 76,
+    scene_key: "hansando",
   },
   {
     id: 3,
     title: "3.1 운동",
     year: 1919,
     region: "서울 탑골공원",
-    description: "일제강점기 조선 민중이 독립을 요구하며 전개한 전국적 만세 운동이다.",
-    x: 46,
-    y: 31,
-    scene_key: "samil"
-  }
+    description:
+      "일제강점기 조선 민중이 독립을 요구하며 전개한 전국적 만세 운동입니다.",
+    x: 52,
+    y: 36,
+    scene_key: "samil",
+  },
 ];
 
 const placeLabels = [
-  { name: "한양", x: 46, y: 32 },
-  { name: "평양", x: 42, y: 19 },
-  { name: "경주", x: 61, y: 65 },
-  { name: "전주", x: 43, y: 63 },
-  { name: "통영", x: 58, y: 74 },
-  { name: "제주", x: 35, y: 90 }
+  { name: "평양", x: 47, y: 22, description: "고구려와 조선 시대 북방의 중요한 도시입니다." },
+  { name: "한양", x: 52, y: 36, description: "조선의 수도로 정치와 문화의 중심지였습니다." },
+  { name: "공주", x: 45, y: 52, description: "백제의 도읍이었던 역사 도시입니다." },
+  { name: "전주", x: 45, y: 63, description: "조선 왕조와 전통 문화가 깊게 연결된 지역입니다." },
+  { name: "경주", x: 62, y: 67, description: "신라의 수도였던 대표적인 역사 도시입니다." },
+  { name: "통영", x: 56, y: 76, description: "한산도 대첩과 관련된 남해안의 중요 지역입니다." },
+  { name: "제주", x: 45, y: 93, description: "탐라 문화와 독자적인 설화가 전해지는 지역입니다." },
 ];
 
 export async function initHistoryPage() {
@@ -82,8 +91,10 @@ export async function initHistoryPage() {
 
   setupHistoryMapUI(map);
   await loadHistoryEvents();
-  renderHistoryMap();
+  renderPlaceLabels();
+  renderEventMarkers(historyEvents);
   updateEraInfo();
+  applyMapTransform();
 
   if (timeline) {
     timeline.addEventListener("input", (event) => {
@@ -102,7 +113,7 @@ async function loadHistoryEvents() {
       .order("year", { ascending: true });
 
     if (error) {
-      console.error("역사 데이터 불러오기 실패:", error);
+      console.error("Supabase 역사 데이터 불러오기 실패:", error);
       historyEvents = fallbackEvents;
       return;
     }
@@ -131,19 +142,16 @@ function setupHistoryMapUI(map) {
 
     <div class="map-viewport" id="map-viewport">
       <div class="map-layer" id="map-layer">
-        <img 
+        <img
           class="korea-map-image"
           src="./assets/images/map-korea.png"
           alt="한국 고지도"
-          onerror="this.style.display='none'; document.querySelector('.fallback-map-shape').style.display='block';"
         />
 
-        <div class="fallback-map-shape"></div>
-
         <svg class="history-path-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path 
+          <path
             id="history-path"
-            d="M46 32 C50 45, 55 60, 58 74"
+            d="M52 36 C54 48, 56 62, 56 76"
           />
         </svg>
 
@@ -164,12 +172,6 @@ function setupHistoryMapUI(map) {
   viewport.addEventListener("mousemove", moveDrag);
   viewport.addEventListener("mouseup", endDrag);
   viewport.addEventListener("mouseleave", endDrag);
-}
-
-function renderHistoryMap() {
-  renderPlaceLabels();
-  renderEventMarkers(historyEvents);
-  applyMapTransform();
 }
 
 function renderPlaceLabels() {
@@ -247,9 +249,9 @@ function showPlaceInfo(place) {
     <article class="selected-history-card">
       <span class="info-badge">지명 정보</span>
       <h4>${place.name}</h4>
+      <p>${place.description}</p>
       <p>
-        지도 위 지명을 클릭했습니다. 이후 이 영역에 해당 지역의 역사적 사건,
-        관련 인물, 설화, 문화유산 정보를 연결할 수 있습니다.
+        이후 이 지명과 연결된 역사 사건, 설화, 신화, 문화유산 정보를 추가할 수 있습니다.
       </p>
     </article>
   `;
@@ -275,11 +277,15 @@ function filterEventsByEra() {
   }
 
   if (currentEraIndex === 1) {
-    filteredEvents = historyEvents.filter((event) => event.year >= 936 && event.year <= 1592);
+    filteredEvents = historyEvents.filter(
+      (event) => event.year >= 936 && event.year <= 1592
+    );
   }
 
   if (currentEraIndex === 2) {
-    filteredEvents = historyEvents.filter((event) => event.year > 1592 && event.year < 1897);
+    filteredEvents = historyEvents.filter(
+      (event) => event.year > 1592 && event.year < 1897
+    );
   }
 
   if (currentEraIndex === 3) {
@@ -295,13 +301,21 @@ function filterEventsByEra() {
 
 function zoomIn() {
   currentZoom += 0.2;
-  if (currentZoom > 2.5) currentZoom = 2.5;
+
+  if (currentZoom > 3) {
+    currentZoom = 3;
+  }
+
   applyMapTransform();
 }
 
 function zoomOut() {
   currentZoom -= 0.2;
-  if (currentZoom < 0.7) currentZoom = 0.7;
+
+  if (currentZoom < 0.5) {
+    currentZoom = 0.5;
+  }
+
   applyMapTransform();
 }
 
@@ -343,6 +357,7 @@ function endDrag() {
 
 function applyMapTransform() {
   const mapLayer = document.getElementById("map-layer");
+
   if (!mapLayer) return;
 
   mapLayer.style.transform = `
@@ -388,7 +403,7 @@ function drawHistoryScene(event) {
     description.innerHTML = `
       <p>
         <strong>${event.title}</strong>의 상황을 간단한 2D 장면으로 표현했습니다.
-        이후 배경 이미지, 인물 이미지, 대화창을 추가하면 더 완성도 있는 장면으로 확장할 수 있습니다.
+        이후 배경 이미지, 인물 이미지, 대화창을 추가하면 더 완성도 있게 확장할 수 있습니다.
       </p>
     `;
   }

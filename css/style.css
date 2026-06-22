@@ -6,11 +6,38 @@
   box-sizing: border-box;
 }
 
+:root {
+  --color-bg: #f6f0e3;
+  --color-paper: #fff8ea;
+  --color-ink: #241914;
+  --color-brown: #59463b;
+  --color-red: #a33a32;
+  --color-blue: #1d4f5a;
+  --color-green: #2e6653;
+  --color-gold: #c69a36;
+  --color-line: #d7b66d;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   font-family: "Noto Sans KR", "Pretendard", Arial, sans-serif;
-  background: #f6f0e3;
-  color: #241914;
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(198, 154, 54, 0.12), transparent 28%),
+    radial-gradient(circle at 85% 20%, rgba(163, 58, 50, 0.09), transparent 30%),
+    linear-gradient(135deg, rgba(255, 248, 234, 0.92), rgba(246, 240, 227, 0.96));
 }
 
 button,
@@ -23,16 +50,8 @@ button {
   cursor: pointer;
 }
 
-:root {
-  --color-bg: #f6f0e3;
-  --color-paper: #fff8ea;
-  --color-ink: #241914;
-  --color-brown: #59463b;
-  --color-red: #a33a32;
-  --color-blue: #1d4f5a;
-  --color-green: #2e6653;
-  --color-gold: #c69a36;
-  --color-line: #d7b66d;
+img {
+  max-width: 100%;
 }
 
 /* =========================
@@ -46,7 +65,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 22px;
   padding: 16px 40px;
   background: linear-gradient(135deg, #1f2a2a, #3d2620);
   color: #fff8ea;
@@ -61,24 +80,26 @@ button {
 }
 
 .logo-mark {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: var(--color-gold);
   color: var(--color-ink);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 900;
+  flex-shrink: 0;
 }
 
 .logo-text h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
+  line-height: 1.1;
 }
 
 .logo-text p {
-  margin: 3px 0 0;
+  margin: 6px 0 0;
   font-size: 13px;
   color: #e9d8b6;
 }
@@ -91,11 +112,11 @@ button {
 
 .nav-btn {
   border: none;
-  padding: 10px 18px;
+  padding: 11px 20px;
   border-radius: 999px;
   background: transparent;
   color: #fff8ea;
-  font-weight: 800;
+  font-weight: 900;
   font-size: 15px;
 }
 
@@ -107,19 +128,20 @@ button {
 
 .ai-open-btn {
   border: none;
-  padding: 10px 18px;
+  padding: 12px 20px;
   border-radius: 999px;
   background: var(--color-red);
   color: #fff8ea;
-  font-weight: 800;
+  font-weight: 900;
+  font-size: 15px;
 }
 
 /* =========================
-   공통 페이지
+   공통 레이아웃
 ========================= */
 
 .main-container {
-  width: min(1440px, 100%);
+  width: min(1480px, 100%);
   margin: 0 auto;
   padding: 36px 32px 80px;
 }
@@ -134,13 +156,13 @@ button {
 
 .section-badge {
   display: inline-block;
-  padding: 7px 13px;
+  padding: 8px 14px;
   border-radius: 999px;
   background: rgba(198, 154, 54, 0.18);
   color: var(--color-red);
   font-size: 13px;
   font-weight: 900;
-  border: 1px solid rgba(198, 154, 54, 0.4);
+  border: 1px solid rgba(198, 154, 54, 0.42);
 }
 
 .page-title {
@@ -149,20 +171,20 @@ button {
 
 .page-title h2 {
   margin: 14px 0 8px;
-  font-size: 38px;
+  font-size: 40px;
 }
 
 .page-title p {
   margin: 0;
   color: var(--color-brown);
   font-size: 17px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .primary-btn,
 .secondary-btn {
   border: none;
-  padding: 12px 18px;
+  padding: 13px 20px;
   border-radius: 999px;
   font-size: 15px;
   font-weight: 900;
@@ -178,6 +200,12 @@ button {
   color: #fff8ea;
 }
 
+.primary-btn:hover,
+.secondary-btn:hover,
+.ai-open-btn:hover {
+  filter: brightness(0.92);
+}
+
 .text-btn {
   border: none;
   background: transparent;
@@ -191,36 +219,37 @@ button {
 
 .hero-section {
   display: grid;
-  grid-template-columns: 1fr 520px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(420px, 0.75fr);
   gap: 32px;
-  align-items: center;
+  align-items: stretch;
   margin-bottom: 36px;
 }
 
 .hero-text {
   padding: 40px;
   border-radius: 32px;
-  background: rgba(255, 248, 234, 0.86);
+  background: rgba(255, 248, 234, 0.88);
   border: 2px solid var(--color-line);
   box-shadow: 0 18px 40px rgba(36, 25, 20, 0.12);
 }
 
 .hero-text h2 {
-  margin: 18px 0;
-  font-size: 46px;
-  line-height: 1.16;
+  margin: 22px 0 18px;
+  font-size: 48px;
+  line-height: 1.15;
+  letter-spacing: -1.5px;
 }
 
 .hero-text p {
   color: var(--color-brown);
   font-size: 18px;
-  line-height: 1.7;
+  line-height: 1.8;
 }
 
 .hero-actions {
   display: flex;
   gap: 12px;
-  margin-top: 26px;
+  margin-top: 28px;
 }
 
 .hero-map-card {
@@ -236,6 +265,20 @@ button {
 .map-preview {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+}
+
+.hero-korea-map-image {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: auto;
+  height: 94%;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  opacity: 0.98;
+  pointer-events: none;
+  filter: contrast(1.03) saturate(0.95);
 }
 
 .map-shape {
@@ -252,46 +295,52 @@ button {
 
 .route-line {
   position: absolute;
-  left: 35%;
-  top: 34%;
-  width: 240px;
+  z-index: 5;
+  left: 48%;
+  top: 31%;
+  width: 270px;
   height: 160px;
   border-top: 4px dashed var(--color-red);
   transform: rotate(28deg);
+  opacity: 0.9;
 }
 
 .marker {
   position: absolute;
+  z-index: 10;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 3px solid #fff8ea;
   color: #fff8ea;
   font-weight: 900;
+  font-size: 18px;
+  box-shadow: 0 10px 20px rgba(36, 25, 20, 0.25);
 }
 
 .marker-red {
-  left: 35%;
-  top: 52%;
+  left: 37%;
+  top: 54%;
   background: var(--color-red);
 }
 
 .marker-blue {
-  left: 52%;
-  top: 42%;
+  left: 55%;
+  top: 45%;
   background: var(--color-blue);
 }
 
 .marker-green {
-  left: 65%;
-  top: 32%;
+  left: 68%;
+  top: 36%;
   background: var(--color-green);
 }
 
 .preview-card {
   position: absolute;
+  z-index: 20;
   left: 24px;
   right: 24px;
   bottom: 24px;
@@ -299,10 +348,12 @@ button {
   border-radius: 22px;
   background: rgba(255, 248, 234, 0.94);
   border: 1px solid var(--color-line);
+  backdrop-filter: blur(4px);
 }
 
 .preview-card h3 {
   margin: 0 0 8px;
+  font-size: 22px;
 }
 
 .preview-card p {
@@ -333,17 +384,17 @@ button {
 
 .feature-card h3 {
   margin: 0 0 12px;
-  font-size: 24px;
+  font-size: 26px;
 }
 
 .feature-card p {
   margin: 0;
   color: var(--color-brown);
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 /* =========================
-   역사 페이지 레이아웃
+   역사 페이지
 ========================= */
 
 .history-layout {
@@ -358,6 +409,19 @@ button {
 
 .map-panel {
   grid-area: map;
+}
+
+.info-panel {
+  grid-area: info;
+}
+
+.scene-panel {
+  grid-area: scene;
+}
+
+.map-panel,
+.info-panel,
+.scene-panel {
   padding: 22px;
   border-radius: 28px;
   background: var(--color-paper);
@@ -372,45 +436,10 @@ button {
   font-size: 24px;
 }
 
-.info-panel {
-  grid-area: info;
-  padding: 22px;
-  border-radius: 28px;
-  background: var(--color-paper);
-  border: 2px solid var(--color-line);
-  box-shadow: 0 16px 34px rgba(36, 25, 20, 0.1);
-}
-
-.scene-panel {
-  grid-area: scene;
-  padding: 22px;
-  border-radius: 28px;
-  background: var(--color-paper);
-  border: 2px solid var(--color-line);
-  box-shadow: 0 16px 34px rgba(36, 25, 20, 0.1);
-}
-
-.scene-panel canvas {
-  width: 100%;
-  height: auto;
-  border-radius: 18px;
-  background: #1f2a2a;
-}
-
-.scene-description {
-  margin-top: 14px;
-  color: var(--color-brown);
-  line-height: 1.6;
-}
-
-/* =========================
-   인터랙티브 역사 지도
-========================= */
-
 .history-map {
   position: relative;
   width: 100%;
-  height: 680px;
+  height: 720px;
   overflow: hidden;
   border-radius: 24px;
   background: #ead9bd;
@@ -463,14 +492,14 @@ button {
 
 .era-floating-card span {
   display: block;
-  color: #a33a32;
+  color: var(--color-red);
   font-weight: 900;
   margin-bottom: 8px;
 }
 
 .era-floating-card p {
   margin: 0;
-  color: #59463b;
+  color: var(--color-brown);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -494,7 +523,6 @@ button {
   transition: transform 0.15s ease-out;
 }
 
-/* 고지도 이미지 */
 .korea-map-image {
   position: absolute;
   left: 50%;
@@ -508,20 +536,6 @@ button {
   filter: contrast(1.03) saturate(0.95);
 }
 
-/* 지도 이미지가 없을 때 임시 지도 */
-.fallback-map-shape {
-  display: none;
-  position: absolute;
-  left: 22%;
-  top: 10%;
-  width: 52%;
-  height: 78%;
-  background: #d8c09a;
-  border: 3px solid #81592b;
-  border-radius: 48% 52% 45% 55% / 35% 40% 60% 65%;
-  transform: rotate(-10deg);
-}
-
 .history-path-svg {
   position: absolute;
   inset: 0;
@@ -532,7 +546,7 @@ button {
 
 .history-path-svg path {
   fill: none;
-  stroke: #a33a32;
+  stroke: var(--color-red);
   stroke-width: 1.3;
   stroke-dasharray: 3 2;
   opacity: 0.9;
@@ -549,8 +563,8 @@ button {
   position: absolute;
   transform: translate(-50%, -50%);
   border: 1px solid rgba(36, 25, 20, 0.25);
-  background: rgba(255, 248, 234, 0.9);
-  color: #241914;
+  background: rgba(255, 248, 234, 0.92);
+  color: var(--color-ink);
   padding: 5px 10px;
   border-radius: 999px;
   font-size: 13px;
@@ -561,7 +575,7 @@ button {
 }
 
 .place-label:hover {
-  background: #c69a36;
+  background: var(--color-gold);
   color: #fff8ea;
 }
 
@@ -579,7 +593,7 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: #a33a32;
+  background: var(--color-red);
   color: #fff8ea;
   font-weight: 900;
   border: 3px solid #fff8ea;
@@ -592,7 +606,7 @@ button {
   top: 38px;
   transform: translateX(-50%);
   white-space: nowrap;
-  background: #241914;
+  background: var(--color-ink);
   color: #fff8ea;
   padding: 4px 8px;
   border-radius: 999px;
@@ -601,39 +615,10 @@ button {
 }
 
 .history-event-marker:hover .marker-person {
-  background: #1d4f5a;
+  background: var(--color-blue);
   transform: scale(1.1);
 }
 
-.selected-history-card {
-  background: #fff8ea;
-  border: 1px solid #d7b66d;
-  border-radius: 18px;
-  padding: 16px;
-}
-
-.selected-history-card h4 {
-  margin: 8px 0 12px;
-  font-size: 22px;
-  color: #241914;
-}
-
-.selected-history-card p {
-  color: #59463b;
-  line-height: 1.6;
-}
-
-.info-badge {
-  display: inline-block;
-  background: #a33a32;
-  color: #fff8ea;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-/* 연표 */
 .timeline {
   display: flex;
   align-items: center;
@@ -654,6 +639,47 @@ button {
   color: var(--color-brown);
   font-size: 14px;
   font-weight: 700;
+}
+
+.selected-history-card {
+  background: #fff8ea;
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.selected-history-card h4 {
+  margin: 8px 0 12px;
+  font-size: 22px;
+  color: var(--color-ink);
+}
+
+.selected-history-card p {
+  color: var(--color-brown);
+  line-height: 1.6;
+}
+
+.info-badge {
+  display: inline-block;
+  background: var(--color-red);
+  color: #fff8ea;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.scene-panel canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  background: #1f2a2a;
+}
+
+.scene-description {
+  margin-top: 14px;
+  color: var(--color-brown);
+  line-height: 1.6;
 }
 
 /* =========================
@@ -688,12 +714,20 @@ button {
   line-height: 1.6;
 }
 
+.game-mode-card label {
+  display: block;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 900;
+}
+
 .game-mode-card select {
   width: 100%;
   margin-top: 8px;
-  padding: 10px;
+  padding: 11px 12px;
   border-radius: 12px;
   border: 1px solid var(--color-line);
+  background: #fff;
 }
 
 .online-room-panel {
@@ -708,21 +742,34 @@ button {
   margin-bottom: 22px;
 }
 
+.online-room-panel h3 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+
+.online-room-panel p {
+  margin: 0;
+  color: var(--color-brown);
+  line-height: 1.6;
+}
+
 .room-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  justify-content: flex-end;
 }
 
 .room-actions input {
-  padding: 11px 14px;
+  padding: 12px 14px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
+  min-width: 150px;
 }
 
 .game-layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 22px;
 }
 
@@ -734,6 +781,12 @@ button {
   border: 2px solid var(--color-line);
 }
 
+.board-panel h3,
+.game-info-panel h3 {
+  margin: 0 0 14px;
+  font-size: 24px;
+}
+
 .game-board {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -742,13 +795,21 @@ button {
 }
 
 .board-cell {
-  min-height: 80px;
+  min-height: 82px;
   display: grid;
   place-items: center;
+  text-align: center;
   border-radius: 16px;
   background: #f3e5c7;
   border: 1px solid var(--color-gold);
   font-weight: 900;
+  padding: 8px;
+}
+
+#game-status,
+#room-list {
+  color: var(--color-brown);
+  line-height: 1.6;
 }
 
 /* =========================
@@ -757,7 +818,7 @@ button {
 
 .myth-layout {
   display: grid;
-  grid-template-columns: 240px 1fr 420px;
+  grid-template-columns: 240px minmax(0, 1fr) 420px;
   gap: 22px;
 }
 
@@ -768,6 +829,12 @@ button {
   border-radius: 24px;
   background: var(--color-paper);
   border: 2px solid var(--color-line);
+}
+
+.myth-category-panel h3,
+.myth-scene-panel h3 {
+  margin: 0 0 16px;
+  font-size: 24px;
 }
 
 .category-btn {
@@ -815,6 +882,7 @@ button {
 
 .myth-card h3 {
   margin: 0 0 8px;
+  font-size: 22px;
 }
 
 .myth-card p {
@@ -838,7 +906,7 @@ button {
   right: 24px;
   bottom: 24px;
   z-index: 200;
-  width: 360px;
+  width: 370px;
   max-width: calc(100% - 48px);
   display: none;
   border-radius: 24px;
@@ -863,6 +931,7 @@ button {
 
 .ai-panel-header h3 {
   margin: 0;
+  font-size: 18px;
 }
 
 .ai-panel-header button {
