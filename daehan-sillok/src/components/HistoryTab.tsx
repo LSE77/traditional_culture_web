@@ -275,8 +275,10 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
     : ((activeIndex + (isMoving ? animationProgress : 0)) / Math.max(1, events.length - 1)) * 100;
 
   // Handle timeline playback with moving icon animation
+  // 핵심: isMoving을 dependency에 넣지 않는다. 넣으면 setIsMoving(true) 직후 effect가 재실행되어
+  // requestAnimationFrame이 취소되고 progress가 0%에 멈춘다.
   useEffect(() => {
-    if (!isPlaying || events.length <= 1 || isMoving || isWaitingBetweenMoves) {
+    if (!isPlaying || events.length <= 1 || isWaitingBetweenMoves) {
       return;
     }
 
@@ -291,9 +293,14 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
     const distance = Math.hypot(toEvent.mapX - fromEvent.mapX, toEvent.mapY - fromEvent.mapY);
     const minVisibleDuration = distance < 6 ? 6500 : 4500;
-    const duration = Math.max(toEvent.animationDurationMs ?? playbackSpeed, minVisibleDuration);
-    const pauseAfter = toEvent.pauseAfterMs ?? 700;
+    const duration = Math.max(Number(toEvent.animationDurationMs ?? playbackSpeed), minVisibleDuration);
+    const pauseAfter = Math.max(Number(toEvent.pauseAfterMs ?? 700), 400);
     let startTime: number | null = null;
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
 
     setMovingFromIndex(fromIndex);
     setMovingToIndex(toIndex);
@@ -307,6 +314,8 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
       const elapsed = timestamp - startTime;
       const rawProgress = Math.min(elapsed / duration, 1);
+
+      // 이동이 눈에 보이도록 완만한 ease-in-out 적용
       const easedProgress = rawProgress < 0.5
         ? 2 * rawProgress * rawProgress
         : 1 - Math.pow(-2 * rawProgress + 2, 2) / 2;
@@ -319,15 +328,17 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
       }
 
       setAnimationProgress(1);
-      setActiveIndex(toIndex);
-      setShowPopup(true);
       setIsMoving(false);
+      setShowPopup(true);
       setIsWaitingBetweenMoves(true);
 
+      // 도착 지점에 잠깐 머문 뒤 activeIndex를 바꾼다.
+      // 이렇게 해야 다음 effect가 바로 시작되지 않고 pauseAfter가 적용된다.
       pauseTimerRef.current = setTimeout(() => {
-        setAnimationProgress(0);
+        setActiveIndex(toIndex);
         setMovingFromIndex(toIndex);
         setMovingToIndex(toIndex);
+        setAnimationProgress(0);
         setIsWaitingBetweenMoves(false);
       }, pauseAfter);
     };
@@ -340,7 +351,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
         animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, activeIndex, events, playbackSpeed, isMoving, isWaitingBetweenMoves]);
+  }, [isPlaying, activeIndex, events.length, playbackSpeed, isWaitingBetweenMoves]);
 
   useEffect(() => {
     return () => {
