@@ -1,0 +1,6 @@
+{
+  "name": "대한실록",
+  "description": "역사적인 사건의 흐름과 한국 전통 설화를 반응형 애니메이션과 지도, 그리고 AI 해설로 감상하고 배우는 대화형 역사 서적 아카이브.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

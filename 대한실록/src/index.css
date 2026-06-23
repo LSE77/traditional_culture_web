@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Serif+KR:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Gowun Batang", "Noto Serif KR", serif;
+  --font-sans: "Noto Serif KR", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/* Custom styles for parchment / Hanji feel */
+.hanji-bg {
+  background-color: #f6efe2;
+  background-image: radial-gradient(#ebdcb9 1px, transparent 1px), radial-gradient(#ebdcb9 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+
+.hanji-texture {
+  background: #fdfaf4;
+  border: 1px solid #dcd1ba;
+  box-shadow: inset 0 0 15px rgba(220, 209, 186, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.historic-btn {
+  transition: all 0.3s ease;
+  font-family: "Gowun Batang", serif;
+}
+
+/* Animated brush underline or border effects */
+.brush-border {
+  border-image: linear-gradient(to right, transparent, #3e322b, transparent) 1;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(1deg); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(20, 184, 166, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(20, 184, 166, 0.6); }
+}
+
+.myth-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
