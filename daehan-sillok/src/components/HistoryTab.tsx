@@ -703,7 +703,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                   className="absolute inset-0 w-full h-full pointer-events-none"
                 >
                   <img 
-                    src="/src/assets/images/antique_korea_map_1782138795299.jpg" 
+                    src="/antique_korea_map.jpg" 
                     alt="조선 고지도 바탕" 
                     className="w-full h-full object-cover opacity-85 filter sepia contrast-125 select-none"
                     onError={(e) => {
@@ -1082,7 +1082,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                     className="absolute inset-0 w-full h-full pointer-events-none"
                   >
                     <img 
-                      src="/src/assets/images/antique_korea_map_1782138795299.jpg" 
+                      src="/antique_korea_map.jpg" 
                       alt="조선 고지도 바탕" 
                       className="w-full h-full object-cover opacity-85 filter sepia contrast-125 select-none"
                       onError={(e) => {
