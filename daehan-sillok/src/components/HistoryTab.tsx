@@ -140,6 +140,9 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
   const [animationProgress, setAnimationProgress] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
   const [isWaitingBetweenMoves, setIsWaitingBetweenMoves] = useState(false);
+  // 자동재생은 마지막 사건에서 처음으로 순간 점프하지 않고,
+  // 끝에 도달하면 방향을 반대로 바꿔 왕복 재생한다.
+  const playbackDirectionRef = useRef<1 | -1>(1);
 
   // Dynamic AI commentary states
   const [aiAnalysis, setAiAnalysis] = useState<string>("");
@@ -234,6 +237,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
     setIsMoving(false);
     setIsWaitingBetweenMoves(false);
     setAnimationProgress(0);
+    playbackDirectionRef.current = 1;
   };
 
   const getAnimatedEvent = (index: number): AnimatedHistoricalEvent | undefined => {
@@ -260,7 +264,10 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
     const x = fromEvent.mapX + (toEvent.mapX - fromEvent.mapX) * animationProgress;
     let y = fromEvent.mapY + (toEvent.mapY - fromEvent.mapY) * animationProgress;
 
-    if (toEvent.movementType === "arc") {
+    // 이동 구간의 애니메이션 방식은 두 지점 중 뒤쪽 사건의 movementType을 기준으로 사용한다.
+    // 예: 1번→2번도 2번의 arc, 2번→1번도 같은 구간이므로 2번의 arc를 사용한다.
+    const segmentEvent = getAnimatedEvent(Math.max(movingFromIndex, movingToIndex));
+    if (segmentEvent?.movementType === "arc") {
       y -= Math.sin(animationProgress * Math.PI) * 7;
     }
 
@@ -270,9 +277,19 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
   const movingIconPosition = getMovingIconPosition();
   const movingSourceEvent = getAnimatedEvent(movingFromIndex);
   const movingTargetEvent = getAnimatedEvent(movingToIndex);
+  const timelineVirtualIndex = isMoving
+    ? movingFromIndex + (movingToIndex - movingFromIndex) * animationProgress
+    : activeIndex;
+
   const timelineProgress = events.length <= 1
     ? 0
-    : ((activeIndex + (isMoving ? animationProgress : 0)) / Math.max(1, events.length - 1)) * 100;
+    : Math.min(
+        100,
+        Math.max(
+          0,
+          (timelineVirtualIndex / Math.max(1, events.length - 1)) * 100
+        )
+      );
 
   // Handle timeline playback with moving icon animation
   // 핵심: isMoving을 dependency에 넣지 않는다. 넣으면 setIsMoving(true) 직후 effect가 재실행되어
@@ -283,7 +300,17 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
     }
 
     const fromIndex = activeIndex;
-    const toIndex = activeIndex >= events.length - 1 ? 0 : activeIndex + 1;
+
+    let direction = playbackDirectionRef.current;
+    if (fromIndex >= events.length - 1 && direction === 1) {
+      direction = -1;
+    }
+    if (fromIndex <= 0 && direction === -1) {
+      direction = 1;
+    }
+    playbackDirectionRef.current = direction;
+
+    const toIndex = fromIndex + direction;
     const fromEvent = getAnimatedEvent(fromIndex);
     const toEvent = getAnimatedEvent(toIndex);
 
@@ -401,12 +428,14 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
   // Timeline controls
   const handleStepPrev = () => {
     stopPlaybackMovement();
+    playbackDirectionRef.current = -1;
     if (events.length === 0) return;
     setActiveIndex((prev) => (prev > 0 ? prev - 1 : events.length - 1));
   };
 
   const handleStepNext = () => {
     stopPlaybackMovement();
+    playbackDirectionRef.current = 1;
     if (events.length === 0) return;
     setActiveIndex((prev) => (prev < events.length - 1 ? prev + 1 : 0));
   };
