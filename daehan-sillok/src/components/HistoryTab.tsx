@@ -46,6 +46,19 @@ type SupabaseEventRow = {
   details: string[] | null;
   category: string;
   icon_name: string;
+  sort_order: number | null;
+  animation_duration_ms: number | null;
+  pause_after_ms: number | null;
+  animation_icon: string | null;
+  movement_type: string | null;
+};
+
+type AnimatedHistoricalEvent = HistoricalEvent & {
+  sortOrder?: number;
+  animationDurationMs?: number;
+  pauseAfterMs?: number;
+  animationIcon?: string;
+  movementType?: "linear" | "arc" | "fade" | string;
 };
 
 function convertBookRowsToBooks(
@@ -61,7 +74,16 @@ function convertBookRowsToBooks(
     accentColor: book.accent_color,
     events: eventRows
       .filter((event) => event.book_id === book.id)
-      .sort((a, b) => a.year - b.year)
+      .sort((a, b) => {
+        const orderA = a.sort_order ?? 0;
+        const orderB = b.sort_order ?? 0;
+
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+
+        return a.year - b.year;
+      })
       .map((event) => ({
         id: event.id,
         title: event.title,
@@ -74,7 +96,12 @@ function convertBookRowsToBooks(
         details: Array.isArray(event.details) ? event.details : [],
         category: event.category as HistoricalEvent["category"],
         iconName: event.icon_name as HistoricalEvent["iconName"],
-      })),
+        sortOrder: event.sort_order ?? 0,
+        animationDurationMs: event.animation_duration_ms ?? 2500,
+        pauseAfterMs: event.pause_after_ms ?? 700,
+        animationIcon: event.animation_icon ?? event.icon_name ?? "map-pin",
+        movementType: event.movement_type ?? "linear",
+      } as AnimatedHistoricalEvent)),
   }));
 }
 
@@ -106,7 +133,13 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
   // Playback control
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(2500); // ms per step
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [movingFromIndex, setMovingFromIndex] = useState(0);
+  const [movingToIndex, setMovingToIndex] = useState(0);
+  const [animationProgress, setAnimationProgress] = useState(0);
+  const [isMoving, setIsMoving] = useState(false);
+  const [isWaitingBetweenMoves, setIsWaitingBetweenMoves] = useState(false);
 
   // Dynamic AI commentary states
   const [aiAnalysis, setAiAnalysis] = useState<string>("");
@@ -134,7 +167,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
         const { data: bookRows, error: bookError } = await supabase
           .from("historical_books")
           .select("*")
-          .order("created_at", { ascending: true });
+          .order("sort_order", { ascending: true });
 
         if (bookError) {
           throw bookError;
@@ -143,7 +176,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
         const { data: eventRows, error: eventError } = await supabase
           .from("historical_events")
           .select("*")
-          .order("year", { ascending: true });
+          .order("sort_order", { ascending: true });
 
         if (eventError) {
           throw eventError;
@@ -183,30 +216,130 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
     setAiError("");
   }, [activeIndex, activeBookId]);
 
-  // Handle timeline playback
-  useEffect(() => {
-    if (isPlaying && events.length > 0) {
-      timerRef.current = setInterval(() => {
-        setActiveIndex((prev) => {
-          if (prev >= events.length - 1) {
-            return 0; // Loop back
-          }
-          return prev + 1;
-        });
-      }, playbackSpeed);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+  const clearMovementTimers = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
 
+    if (pauseTimerRef.current) {
+      clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = null;
+    }
+  };
+
+  const stopPlaybackMovement = () => {
+    clearMovementTimers();
+    setIsPlaying(false);
+    setIsMoving(false);
+    setIsWaitingBetweenMoves(false);
+    setAnimationProgress(0);
+  };
+
+  const getAnimatedEvent = (index: number): AnimatedHistoricalEvent | undefined => {
+    return events[index] as AnimatedHistoricalEvent | undefined;
+  };
+
+  const getMovingIconPosition = () => {
+    const fallbackEvent = getAnimatedEvent(activeIndex);
+
+    if (!fallbackEvent) {
+      return null;
+    }
+
+    if (!isMoving) {
+      return {
+        x: fallbackEvent.mapX,
+        y: fallbackEvent.mapY,
+      };
+    }
+
+    const fromEvent = getAnimatedEvent(movingFromIndex) || fallbackEvent;
+    const toEvent = getAnimatedEvent(movingToIndex) || fallbackEvent;
+
+    const x = fromEvent.mapX + (toEvent.mapX - fromEvent.mapX) * animationProgress;
+    let y = fromEvent.mapY + (toEvent.mapY - fromEvent.mapY) * animationProgress;
+
+    if (toEvent.movementType === "arc") {
+      y -= Math.sin(animationProgress * Math.PI) * 7;
+    }
+
+    return { x, y };
+  };
+
+  const movingIconPosition = getMovingIconPosition();
+  const movingTargetEvent = getAnimatedEvent(movingToIndex);
+  const timelineProgress = events.length <= 1
+    ? 0
+    : ((activeIndex + (isMoving ? animationProgress : 0)) / Math.max(1, events.length - 1)) * 100;
+
+  // Handle timeline playback with moving icon animation
+  useEffect(() => {
+    if (!isPlaying || events.length <= 1 || isMoving || isWaitingBetweenMoves) {
+      return;
+    }
+
+    const fromIndex = activeIndex;
+    const toIndex = activeIndex >= events.length - 1 ? 0 : activeIndex + 1;
+    const toEvent = getAnimatedEvent(toIndex);
+
+    if (!toEvent) {
+      return;
+    }
+
+    const duration = toEvent.animationDurationMs ?? playbackSpeed;
+    const pauseAfter = toEvent.pauseAfterMs ?? 700;
+    let startTime: number | null = null;
+
+    setMovingFromIndex(fromIndex);
+    setMovingToIndex(toIndex);
+    setAnimationProgress(0);
+    setIsMoving(true);
+
+    const animate = (timestamp: number) => {
+      if (startTime === null) {
+        startTime = timestamp;
+      }
+
+      const elapsed = timestamp - startTime;
+      const rawProgress = Math.min(elapsed / duration, 1);
+      const easedProgress = rawProgress < 0.5
+        ? 2 * rawProgress * rawProgress
+        : 1 - Math.pow(-2 * rawProgress + 2, 2) / 2;
+
+      setAnimationProgress(easedProgress);
+
+      if (rawProgress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      setAnimationProgress(0);
+      setActiveIndex(toIndex);
+      setShowPopup(true);
+      setIsMoving(false);
+      setIsWaitingBetweenMoves(true);
+
+      pauseTimerRef.current = setTimeout(() => {
+        setIsWaitingBetweenMoves(false);
+      }, pauseAfter);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, playbackSpeed, events.length]);
+  }, [isPlaying, activeIndex, events, playbackSpeed, isMoving, isWaitingBetweenMoves]);
+
+  useEffect(() => {
+    return () => {
+      clearMovementTimers();
+    };
+  }, []);
 
   // Request Gemini AI Commentary
   const fetchAICommentary = async () => {
@@ -249,13 +382,13 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
   // Timeline controls
   const handleStepPrev = () => {
-    setIsPlaying(false);
+    stopPlaybackMovement();
     if (events.length === 0) return;
     setActiveIndex((prev) => (prev > 0 ? prev - 1 : events.length - 1));
   };
 
   const handleStepNext = () => {
-    setIsPlaying(false);
+    stopPlaybackMovement();
     if (events.length === 0) return;
     setActiveIndex((prev) => (prev < events.length - 1 ? prev + 1 : 0));
   };
@@ -645,6 +778,31 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                       );
                     })}
                   </div>
+
+                  {/* Moving Story Icon: follows Supabase sort_order route when autoplay runs */}
+                  {movingIconPosition && (
+                    <motion.div
+                      className="absolute z-50 pointer-events-none transform -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        left: `${movingIconPosition.x}%`,
+                        top: `${movingIconPosition.y}%`,
+                      }}
+                      animate={{ scale: isMoving ? [1, 1.16, 1] : 1 }}
+                      transition={{ duration: 0.7, repeat: isMoving ? Infinity : 0 }}
+                    >
+                      <div className="relative flex items-center justify-center">
+                        <div className="absolute w-14 h-14 rounded-full bg-[#D4AF37]/25 animate-ping" />
+                        <div className="relative w-11 h-11 rounded-full bg-[#D4AF37] border-2 border-white text-[#1B0604] shadow-xl flex items-center justify-center">
+                          <MapPin className="w-5 h-5" />
+                        </div>
+                        <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1B0604]/90 border border-[#D4AF37] text-[#F8E7C0] text-[10px] font-serif font-black px-2 py-1 shadow-md">
+                          {isMoving
+                            ? `${movingTargetEvent?.locationName ?? "다음 위치"} 이동 중`
+                            : currentEvent?.locationName}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               </div>
 
@@ -812,7 +970,13 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                   </button>
                   
                   <button
-                    onClick={() => setIsPlaying(!isPlaying)}
+                    onClick={() => {
+                      clearMovementTimers();
+                      setIsMoving(false);
+                      setIsWaitingBetweenMoves(false);
+                      setAnimationProgress(0);
+                      setIsPlaying((prev) => !prev);
+                    }}
                     className="p-1.5 px-3 text-xs font-serif font-bold text-white bg-[#8B0000] hover:bg-[#A31D1D] rounded-none border border-[#5C4033] cursor-pointer flex items-center gap-1 shadow-sm transition-all"
                   >
                     {isPlaying ? (
@@ -847,7 +1011,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                   
                   <div className="relative h-2 w-full bg-[#F6F1E5] border border-[#5C4033]/25 rounded-none flex items-center">
                     <div 
-                      style={{ width: `${(activeIndex / Math.max(1, events.length - 1)) * 100}%` }}
+                      style={{ width: `${timelineProgress}%` }}
                       className="absolute inset-y-0 left-0 bg-[#8B0000] h-full pointer-events-none z-10" 
                     />
                     {events.map((_, idx) => (
@@ -991,6 +1155,26 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                         );
                       })}
                     </div>
+
+                    {/* Mobile Moving Story Icon */}
+                    {movingIconPosition && (
+                      <motion.div
+                        className="absolute z-50 pointer-events-none transform -translate-x-1/2 -translate-y-1/2"
+                        style={{
+                          left: `${movingIconPosition.x}%`,
+                          top: `${movingIconPosition.y}%`,
+                        }}
+                        animate={{ scale: isMoving ? [1, 1.14, 1] : 1 }}
+                        transition={{ duration: 0.7, repeat: isMoving ? Infinity : 0 }}
+                      >
+                        <div className="relative flex items-center justify-center">
+                          <div className="absolute w-11 h-11 rounded-full bg-[#D4AF37]/25 animate-ping" />
+                          <div className="relative w-9 h-9 rounded-full bg-[#D4AF37] border-2 border-white text-[#1B0604] shadow-xl flex items-center justify-center">
+                            <MapPin className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
 
