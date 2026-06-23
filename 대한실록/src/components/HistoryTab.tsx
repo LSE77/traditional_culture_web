@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { HistoricalBook, HistoricalEvent } from "../types";
 import { HISTORICAL_BOOKS } from "../data";
+import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   ChevronLeft, 
@@ -23,9 +24,68 @@ interface HistoryTabProps {
   onMapPlayerToggle?: (isActive: boolean) => void;
 }
 
+type SupabaseBookRow = {
+  id: string;
+  title: string;
+  dynasty: string;
+  description: string;
+  cover_color: string;
+  accent_color: string;
+};
+
+type SupabaseEventRow = {
+  id: string;
+  book_id: string;
+  title: string;
+  year: number;
+  date_str: string;
+  map_x: number;
+  map_y: number;
+  location_name: string;
+  description: string;
+  details: string[] | null;
+  category: string;
+  icon_name: string;
+};
+
+function convertBookRowsToBooks(
+  bookRows: SupabaseBookRow[],
+  eventRows: SupabaseEventRow[]
+): HistoricalBook[] {
+  return bookRows.map((book) => ({
+    id: book.id,
+    title: book.title,
+    dynasty: book.dynasty,
+    description: book.description,
+    coverColor: book.cover_color,
+    accentColor: book.accent_color,
+    events: eventRows
+      .filter((event) => event.book_id === book.id)
+      .sort((a, b) => a.year - b.year)
+      .map((event) => ({
+        id: event.id,
+        title: event.title,
+        year: event.year,
+        dateStr: event.date_str,
+        mapX: Number(event.map_x),
+        mapY: Number(event.map_y),
+        locationName: event.location_name,
+        description: event.description,
+        details: Array.isArray(event.details) ? event.details : [],
+        category: event.category as HistoricalEvent["category"],
+        iconName: event.icon_name as HistoricalEvent["iconName"],
+      })),
+  }));
+}
+
 export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerToggle }: HistoryTabProps) {
   // Local state to manage toggled book selection for transit page
-  const [activeBookId, setActiveBookId] = useState<string>("");
+  const [activeBookId, setActiveBookId] = useState<string>(selectedBookId || "");
+
+  // History data source: Supabase first, data.ts fallback if DB is empty or unreachable
+  const [books, setBooks] = useState<HistoricalBook[]>(HISTORICAL_BOOKS);
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
+  const [dbError, setDbError] = useState<string>("");
 
   // Toggle between transit select directory page and interactive map screen
   const [showMapPlayer, setShowMapPlayer] = useState<boolean>(false);
@@ -61,9 +121,61 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Get active book and events
-  const currentBook = HISTORICAL_BOOKS.find(b => b.id === activeBookId) || HISTORICAL_BOOKS[0];
+  const currentBook = books.find(b => b.id === activeBookId) || books[0];
   const events = currentBook ? currentBook.events : [];
   const currentEvent = events[activeIndex] || events[0];
+
+  useEffect(() => {
+    const loadHistoryData = async () => {
+      setIsLoadingDb(true);
+      setDbError("");
+
+      try {
+        const { data: bookRows, error: bookError } = await supabase
+          .from("historical_books")
+          .select("*")
+          .order("created_at", { ascending: true });
+
+        if (bookError) {
+          throw bookError;
+        }
+
+        const { data: eventRows, error: eventError } = await supabase
+          .from("historical_events")
+          .select("*")
+          .order("year", { ascending: true });
+
+        if (eventError) {
+          throw eventError;
+        }
+
+        if (!bookRows || bookRows.length === 0) {
+          setBooks(HISTORICAL_BOOKS);
+          setDbError("Supabase 테이블은 연결됐지만 아직 데이터가 없어 기존 data.ts 사료를 표시합니다.");
+          return;
+        }
+
+        const convertedBooks = convertBookRowsToBooks(
+          bookRows as SupabaseBookRow[],
+          (eventRows || []) as SupabaseEventRow[]
+        );
+
+        setBooks(convertedBooks);
+
+        if (!activeBookId && convertedBooks.length > 0) {
+          setActiveBookId(selectedBookId || "");
+        }
+      } catch (error) {
+        console.error("Supabase history load failed:", error);
+        setBooks(HISTORICAL_BOOKS);
+        setDbError("Supabase 연결에 실패해서 기존 data.ts 사료를 표시합니다.");
+      } finally {
+        setIsLoadingDb(false);
+      }
+    };
+
+    loadHistoryData();
+  }, []);
 
   // Update popup & reset states when event changes
   useEffect(() => {
@@ -245,12 +357,12 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
                     <div className="flex items-center justify-between px-1">
                       <span className="text-[10px] text-[#D4AF37] font-serif font-black flex items-center gap-1.5 uppercase">
-                        <BookOpen className="w-3.5 h-3.5" /> 대전 보전 서책 명록 (총 {HISTORICAL_BOOKS.length}권 수록됨)
+                        <BookOpen className="w-3.5 h-3.5" /> 대전 보전 서책 명록 (총 {books.length}권 수록됨)
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-0.5 max-h-[5800px] overflow-y-auto">
-                      {HISTORICAL_BOOKS.map((book) => (
+                      {books.map((book) => (
                         <motion.div
                           key={book.id}
                           whileHover={{ y: -3, scale: 1.01 }}
@@ -318,7 +430,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                         
                         {/* Scrollable list of compact books for switching */}
                         <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar scrollbar-thin scrollbar-thumb-[#8B2518]">
-                          {HISTORICAL_BOOKS.map((book) => {
+                          {books.map((book) => {
                             const isSelected = activeBookId === book.id;
                             return (
                               <div
