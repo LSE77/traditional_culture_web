@@ -268,6 +268,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
   };
 
   const movingIconPosition = getMovingIconPosition();
+  const movingSourceEvent = getAnimatedEvent(movingFromIndex);
   const movingTargetEvent = getAnimatedEvent(movingToIndex);
   const timelineProgress = events.length <= 1
     ? 0
@@ -281,13 +282,16 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
     const fromIndex = activeIndex;
     const toIndex = activeIndex >= events.length - 1 ? 0 : activeIndex + 1;
+    const fromEvent = getAnimatedEvent(fromIndex);
     const toEvent = getAnimatedEvent(toIndex);
 
-    if (!toEvent) {
+    if (!fromEvent || !toEvent) {
       return;
     }
 
-    const duration = toEvent.animationDurationMs ?? playbackSpeed;
+    const distance = Math.hypot(toEvent.mapX - fromEvent.mapX, toEvent.mapY - fromEvent.mapY);
+    const minVisibleDuration = distance < 6 ? 6500 : 4500;
+    const duration = Math.max(toEvent.animationDurationMs ?? playbackSpeed, minVisibleDuration);
     const pauseAfter = toEvent.pauseAfterMs ?? 700;
     let startTime: number | null = null;
 
@@ -314,13 +318,16 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
         return;
       }
 
-      setAnimationProgress(0);
+      setAnimationProgress(1);
       setActiveIndex(toIndex);
       setShowPopup(true);
       setIsMoving(false);
       setIsWaitingBetweenMoves(true);
 
       pauseTimerRef.current = setTimeout(() => {
+        setAnimationProgress(0);
+        setMovingFromIndex(toIndex);
+        setMovingToIndex(toIndex);
         setIsWaitingBetweenMoves(false);
       }, pauseAfter);
     };
@@ -740,6 +747,31 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                         </g>
                       );
                     })}
+                    {isMoving && movingSourceEvent && movingIconPosition && (
+                      <g>
+                        <line
+                          x1={`${movingSourceEvent.mapX}%`}
+                          y1={`${movingSourceEvent.mapY}%`}
+                          x2={`${movingIconPosition.x}%`}
+                          y2={`${movingIconPosition.y}%`}
+                          stroke="#8B0000"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          className="opacity-90"
+                        />
+                        <line
+                          x1={`${movingSourceEvent.mapX}%`}
+                          y1={`${movingSourceEvent.mapY}%`}
+                          x2={`${movingIconPosition.x}%`}
+                          y2={`${movingIconPosition.y}%`}
+                          stroke="#D4AF37"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeDasharray="5,5"
+                          className="opacity-95"
+                        />
+                      </g>
+                    )}
                   </svg>
 
                   {/* Desktop Pins plotted on map backdrop */}
@@ -787,17 +819,17 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                         left: `${movingIconPosition.x}%`,
                         top: `${movingIconPosition.y}%`,
                       }}
-                      animate={{ scale: isMoving ? [1, 1.16, 1] : 1 }}
-                      transition={{ duration: 0.7, repeat: isMoving ? Infinity : 0 }}
+                      animate={{ rotate: isMoving ? [0, -4, 4, 0] : 0 }}
+                      transition={{ duration: 0.6, repeat: isMoving ? Infinity : 0 }}
                     >
                       <div className="relative flex items-center justify-center">
-                        <div className="absolute w-14 h-14 rounded-full bg-[#D4AF37]/25 animate-ping" />
+                        <div className="absolute w-16 h-16 rounded-full border-2 border-[#D4AF37]/40" />
                         <div className="relative w-11 h-11 rounded-full bg-[#D4AF37] border-2 border-white text-[#1B0604] shadow-xl flex items-center justify-center">
                           <MapPin className="w-5 h-5" />
                         </div>
                         <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1B0604]/90 border border-[#D4AF37] text-[#F8E7C0] text-[10px] font-serif font-black px-2 py-1 shadow-md">
                           {isMoving
-                            ? `${movingTargetEvent?.locationName ?? "다음 위치"} 이동 중`
+                            ? `${movingTargetEvent?.locationName ?? "다음 위치"} 이동 중 · ${Math.round(animationProgress * 100)}%`
                             : currentEvent?.locationName}
                         </div>
                       </div>
@@ -1118,6 +1150,31 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                           </g>
                         );
                       })}
+                      {isMoving && movingSourceEvent && movingIconPosition && (
+                        <g>
+                          <line
+                            x1={`${movingSourceEvent.mapX}%`}
+                            y1={`${movingSourceEvent.mapY}%`}
+                            x2={`${movingIconPosition.x}%`}
+                            y2={`${movingIconPosition.y}%`}
+                            stroke="#8B0000"
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                            className="opacity-90"
+                          />
+                          <line
+                            x1={`${movingSourceEvent.mapX}%`}
+                            y1={`${movingSourceEvent.mapY}%`}
+                            x2={`${movingIconPosition.x}%`}
+                            y2={`${movingIconPosition.y}%`}
+                            stroke="#D4AF37"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeDasharray="5,5"
+                            className="opacity-95"
+                          />
+                        </g>
+                      )}
                     </svg>
 
                     <div className="absolute inset-0 z-20 pointer-events-none">
@@ -1164,11 +1221,11 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                           left: `${movingIconPosition.x}%`,
                           top: `${movingIconPosition.y}%`,
                         }}
-                        animate={{ scale: isMoving ? [1, 1.14, 1] : 1 }}
-                        transition={{ duration: 0.7, repeat: isMoving ? Infinity : 0 }}
+                        animate={{ rotate: isMoving ? [0, -4, 4, 0] : 0 }}
+                        transition={{ duration: 0.6, repeat: isMoving ? Infinity : 0 }}
                       >
                         <div className="relative flex items-center justify-center">
-                          <div className="absolute w-11 h-11 rounded-full bg-[#D4AF37]/25 animate-ping" />
+                          <div className="absolute w-12 h-12 rounded-full border-2 border-[#D4AF37]/40" />
                           <div className="relative w-9 h-9 rounded-full bg-[#D4AF37] border-2 border-white text-[#1B0604] shadow-xl flex items-center justify-center">
                             <MapPin className="w-4 h-4" />
                           </div>
