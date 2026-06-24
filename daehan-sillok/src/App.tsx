@@ -4,11 +4,17 @@
  */
 
 import React, { useState } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { ActiveTab } from "./types";
 import Header from "./components/Header";
 import HomeTab from "./components/HomeTab";
 import HistoryTab from "./components/HistoryTab";
 import FolktalesTab from "./components/FolktalesTab";
+
+import AdminPage from "./lib/AdminPage";
+import HistoryDetailPage from "./lib/HistoryDetailPage";
+import FolktaleDetailPage from "./lib/FolktaleDetailPage";
+
 import { AnimatePresence, motion } from "motion/react";
 
 export default function App() {
@@ -64,24 +70,16 @@ export default function App() {
             transition={{ duration: 0.35, ease: "easeOut" }}
             className="w-full h-full"
           >
-            {activeTab === "home" && (
-              <HomeTab 
-                onSelectBook={handleSelectBookFromHome} 
-                onNavigateToFolktales={handleNavigateToFolktales} 
-              />
-            )}
-            
-            {activeTab === "history" && (
-              <HistoryTab 
-                selectedBookId={selectedBookId} 
-                onSelectBook={setSelectedBookId} 
-                onMapPlayerToggle={setShowHistoryMap}
-              />
-            )}
-            
-            {activeTab === "folktales" && (
-              <FolktalesTab />
-            )}
+
+            <Routes>
+              <Route path="/" element={<HomeTab />} />
+              <Route path="/history" element={<HistoryTab />} />
+              <Route path="/history/:id" element={<HistoryDetailPage />} />
+              <Route path="/folktales" element={<FolktalesTab />} />
+              <Route path="/folktales/:id" element={<FolktaleDetailPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+            </Routes>
+
           </motion.div>
         </AnimatePresence>
       </main>

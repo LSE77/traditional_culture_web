@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { HistoricalBook } from "../types";
-import { HISTORICAL_BOOKS } from "../data";
+import { HISTORICAL_BOOKS } from "../data/history/book";
 import { motion, AnimatePresence } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -97,11 +97,6 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
       >
         {/* Header Indicator */}
         <div className="flex flex-wrap justify-between items-center border-b border-[#D4AF37]/20 pb-4 relative z-10 gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] tracking-widest text-[#D4AF37] font-mono font-bold uppercase">
-              대한실록 특별 전시관 (特別展示館)
-            </span>
-          </div>
           <div className="flex items-center gap-1.5">
             {chapters.map((_, idx) => (
               <button
@@ -186,15 +181,6 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
           </div>
         </div>
 
-        {/* Navigation Controls */}
-        <div className="flex justify-between items-center pt-6 border-t border-neutral-800 mt-6 select-none relative z-20">
-          <span className="text-[11px] text-[#D4AF37]/75 font-serif flex items-center gap-1.5">
-            <span>☞</span> [ 좌우 화살표 버튼 혹은 명록 단추를 누르면 다음 전시 장으로 전환됩니다 ]
-          </span>
-          <span className="text-xs text-[#D4AF37] font-mono bg-[#251E1A] px-3 py-1 border border-[#D4AF37]/15">
-            {activeChapter + 1} / {chapters.length}
-          </span>
-        </div>
       </motion.div>
 
       {/* Decorative Traditional Banner */}

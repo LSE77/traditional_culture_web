@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { HistoricalBook, HistoricalEvent } from "../types";
-import { HISTORICAL_BOOKS } from "../data";
+import { HISTORICAL_BOOKS } from "../data/history/book";
 import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -19,8 +20,6 @@ import {
 } from "lucide-react";
 
 interface HistoryTabProps {
-  selectedBookId: string;
-  onSelectBook: (bookId: string) => void;
   onMapPlayerToggle?: (isActive: boolean) => void;
 }
 
@@ -105,14 +104,16 @@ function convertBookRowsToBooks(
   }));
 }
 
-export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerToggle }: HistoryTabProps) {
+export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
   // Local state to manage toggled book selection for transit page
-  const [activeBookId, setActiveBookId] = useState<string>(selectedBookId || "");
+  const [activeBookId, setActiveBookId] = useState<string>("");
 
   // History data source: Supabase first, data.ts fallback if DB is empty or unreachable
-  const [books, setBooks] = useState<HistoricalBook[]>(HISTORICAL_BOOKS);
+  const [books, setBooks] = useState<HistoricalBook[]>([]);
   const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
   const [dbError, setDbError] = useState<string>("");
+  const navigate = useNavigate();
+
 
   // Toggle between transit select directory page and interactive map screen
   const [showMapPlayer, setShowMapPlayer] = useState<boolean>(false);
@@ -187,6 +188,9 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
         if (!bookRows || bookRows.length === 0) {
           setBooks(HISTORICAL_BOOKS);
+          if (convertedBooks.length > 0 && !activeBookId) {
+            setActiveBookId(convertedBooks[0].id);
+          }
           setDbError("Supabase 테이블은 연결됐지만 아직 데이터가 없어 기존 data.ts 사료를 표시합니다.");
           return;
         }
@@ -198,9 +202,9 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
         setBooks(convertedBooks);
 
-        if (!activeBookId && convertedBooks.length > 0) {
-          setActiveBookId(selectedBookId || "");
-        }
+        // if (!activeBookId && convertedBooks.length > 0) {
+        //   setActiveBookId(convertedBooks[0].id);
+        // }
       } catch (error) {
         console.error("Supabase history load failed:", error);
         setBooks(HISTORICAL_BOOKS);
@@ -489,6 +493,14 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
     });
   };
 
+  if (isLoadingDb && books.length === 0) {
+    return (
+      <div className="p-8 text-center">
+        사료를 불러오는 중...
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-[calc(100vh-80px)] relative text-[#F5F2ED] bg-[#1E0402] overflow-x-hidden" id="history-tab-outer-frame">
       <AnimatePresence mode="wait">
@@ -519,11 +531,8 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                   >
                     {/* Elegant Gyeongbokgung/Kyujanggak header styling - Only visible in card list overview */}
                     <div className="text-center space-y-2 border-b border-[#D4AF37]/20 pb-6 max-w-3xl mx-auto relative">
-                      <div className="flex justify-center mb-1 text-[#D4AF37]">
-                        <Sparkles className="w-5 h-5 animate-pulse" />
-                      </div>
                       <span className="text-[9px] tracking-[0.3em] text-[#D4AF37] font-bold font-serif block uppercase">
-                        [ 奎 章 閣 秘 藏 大 典 SILLOK ]
+                        [ Daehan SILLOK ]
                       </span>
                       <h2 className="text-xl sm:text-3xl font-serif font-black text-white tracking-tight">
                         사서 목록 및 주요 사건 선택
@@ -537,7 +546,7 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
 
                     <div className="flex items-center justify-between px-1">
                       <span className="text-[10px] text-[#D4AF37] font-serif font-black flex items-center gap-1.5 uppercase">
-                        <BookOpen className="w-3.5 h-3.5" /> 대전 보전 서책 명록 (총 {books.length}권 수록됨)
+                        <BookOpen className="w-3.5 h-3.5" /> 목록 (총 {books.length}권 수록됨)
                       </span>
                     </div>
 
@@ -549,7 +558,6 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                           transition={{ type: "spring", stiffness: 400, damping: 25 }}
                           onClick={() => {
                             setActiveBookId(book.id);
-                            onSelectBook(book.id);
                             setActiveIndex(0);
                           }}
                           className="relative p-5 bg-[#310D0A] hover:bg-[#4E1712] border border-[#D4AF37]/25 hover:border-[#D4AF37]/80 rounded-none shadow-md cursor-pointer flex flex-col justify-between group overflow-hidden h-[178px] transition-all duration-300"
@@ -617,7 +625,6 @@ export default function HistoryTab({ selectedBookId, onSelectBook, onMapPlayerTo
                                 key={book.id}
                                 onClick={() => {
                                   setActiveBookId(book.id);
-                                  onSelectBook(book.id);
                                   setActiveIndex(0);
                                 }}
                                 className={`p-2.5 border transition-all cursor-pointer rounded-none flex items-center justify-between ${

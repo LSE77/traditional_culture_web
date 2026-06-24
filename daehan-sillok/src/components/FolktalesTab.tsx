@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { MythicalCreature } from "../types";
-import { MYTHICAL_CREATURES } from "../data";
+import { MYTHICAL_CREATURES } from "../data/myth/creatures";
 import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -124,7 +124,7 @@ const fileToBase64Payload = (file: File): Promise<{ base64: string; mimeType: st
 };
 
 export default function FolktalesTab() {
-  const [creatures, setCreatures] = useState<ExtendedCreature[]>(MYTHICAL_CREATURES as ExtendedCreature[]);
+  const [creatures, setCreatures] = useState<ExtendedCreature[]>([]);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
   const [dbError, setDbError] = useState("");
 
@@ -309,11 +309,11 @@ export default function FolktalesTab() {
 
       const result = await response.json();
       if (!response.ok || result.error) {
-        throw new Error(result.error || "AI 분석 실패");
+        throw new Error(result.error || "Failed");
       }
 
       const normalizedResult: CreatureAiResult = {
-        matchedName: result.matchedName || "판별 불가",
+        matchedName: result.matchedName || "...?",
         confidence: Number(result.confidence ?? 0),
         reason: result.reason || "분석 사유가 반환되지 않았습니다.",
         visualClues: Array.isArray(result.visualClues) ? result.visualClues : [],
@@ -399,11 +399,11 @@ export default function FolktalesTab() {
         <div className="hidden lg:block lg:col-span-3 space-y-4" id="folktales-left-sidebar">
           <div className="text-left space-y-1 mb-2">
             <span className="text-[9px] tracking-widest text-[#00F2FE] font-serif font-black block uppercase">
-              [전통 구술 전승 명부]
+              전통 요괴 목록
             </span>
             <h3 className="text-lg sm:text-xl font-serif font-black text-white">신령 서첩과 영물록</h3>
             <p className="text-xs text-[#00CDAC] font-serif leading-relaxed">
-              민간설화와 신화 속에서 구전되어 오던 신비로운 존재들의 명기첩입니다.
+              책에서 혹은 입으로 구전되어 온 신비로운 존재
             </p>
           </div>
 
@@ -527,7 +527,7 @@ export default function FolktalesTab() {
                       className="absolute top-4 right-4 text-xs font-serif text-[#00FA9A] hover:text-white flex items-center gap-1 border border-[#008B8B]/30 px-2 py-1 bg-[#10242A] cursor-pointer"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
-                      <span>목록회귀</span>
+                      <span>목록</span>
                     </button>
 
                     <div className="space-y-6">
@@ -551,7 +551,7 @@ export default function FolktalesTab() {
                             className="flex items-center gap-1 text-[10px] font-serif font-black text-[#00FA9A] hover:text-white border border-[#00FA9A]/30 hover:border-[#00FA9A] px-2 py-0.5 bg-[#0C1F24] transition-all duration-300 cursor-pointer rounded-none active:scale-95"
                           >
                             <Palette className="w-3.5 h-3.5" />
-                            <span>[영물 畵帖 보기]</span>
+                            <span>영물 보기</span>
                           </button>
                         </div>
                         <p className="text-xs sm:text-sm text-[#D1EAE9] font-serif leading-relaxed text-justify font-medium">
@@ -701,7 +701,7 @@ export default function FolktalesTab() {
                     <div className="w-10 h-10 border border-[#00FA9A]/40 flex items-center justify-center text-[#00FA9A] font-serif text-base bg-[#0E262E]">說</div>
                     <div>
                       <h3 className="text-base sm:text-lg font-serif font-black text-white">
-                        {searchQuery.trim() ? `[검색 결과] ${searchQuery}` : `[${activeCategory}] 서첩 영물록 전승첩`}
+                        {searchQuery.trim()?`[검색 결과]${searchQuery}`:`[${activeCategory}] 서첩 영물록 전승첩`}
                       </h3>
                       <p className="text-xs text-neutral-400 font-serif leading-relaxed mt-0.5">
                         {searchQuery.trim()
@@ -741,13 +741,13 @@ export default function FolktalesTab() {
                           </div>
 
                           <div className="pt-2 border-t border-[#008B8B]/10 flex justify-end items-center text-[9px] font-sans text-neutral-500 group-hover:text-[#00FA9A] transition-colors relative z-10 mt-1">
-                            <span className="font-serif underline">[서한 펼치기]</span>
+                            <span className="font-serif underline">서한 펼치기</span>
                           </div>
                         </motion.div>
                       ))
                     ) : (
                       <div className="col-span-full min-h-[180px] flex items-center justify-center border border-[#008B8B]/15 bg-[#061316]">
-                        <p className="text-xs font-serif text-neutral-500">검색 결과가 없습니다. Supabase 키워드를 추가하거나 다른 단어를 입력해 주십시오.</p>
+                        <p className="text-xs font-serif text-neutral-500">검색 결과가 없습니다.</p>
                       </div>
                     )}
                   </div>

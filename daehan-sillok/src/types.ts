@@ -43,5 +43,4 @@ export interface MythicalCreature {
     friendliness: number; // 인간 친화력
   };
   glowingColor: string; // Accent color (e.g., cyan/teal-blue)
-  quotes: string; // 어록이나 전승 구절
 }
