@@ -60,6 +60,11 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
+
+  //----------------------------------------------한국 고전 종합 DB
+
+  //----------------------------------------------
+
   app.use(express.json({ limit: "25mb" }));
 
   app.post("/api/gemini/analysis", async (req, res) => {
@@ -192,6 +197,103 @@ ${creatureListText}
       return res.status(500).json({ error: "요괴 이미지 분석 중 오류가 발생했습니다." });
     }
   });
+
+app.get("/api/itkc-tree", async (req, res) => {
+  const itemId = String(req.query.itemId ?? "JT");
+  const gubun = String(req.query.gubun ?? "book");
+  const depth = String(req.query.depth ?? "");
+  const dataGubun = String(req.query.dataGubun ?? "");
+  const dataId = String(req.query.dataId ?? "").trim();
+
+  if (!dataId || !depth || !dataGubun) {
+    res.status(400).send("dataId, depth, dataGubun 값이 필요합니다.");
+    return;
+  }
+
+  const params = new URLSearchParams({
+    grpId: "",
+    itemId,
+    gubun,
+    depth,
+    cate1: "",
+    cate2: "",
+    dataGubun,
+    dataId,
+    _: String(Date.now()),
+  });
+
+  const apiUrl = `https://db.itkc.or.kr/dir/treeAjax?${params.toString()}`;
+
+  try {
+    const apiResponse = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        Accept: "text/html,*/*",
+      },
+    });
+
+    const text = await apiResponse.text();
+
+    console.log("ITKC tree request:", apiUrl);
+    console.log("ITKC tree status:", apiResponse.status);
+    console.log("ITKC tree preview:", text.slice(0, 300));
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(apiResponse.status).send(text);
+  } catch (error) {
+    console.error("ITKC tree proxy failed:", error);
+    res.status(500).send("treeAjax 호출에 실패했습니다.");
+  }
+});
+
+app.get("/api/itkc-node", async (req, res) => {
+  const itemId = String(req.query.itemId ?? "JT");
+  const gubun = String(req.query.gubun ?? "book");
+  const depth = String(req.query.depth ?? "");
+  const dataGubun = String(req.query.dataGubun ?? "");
+  const dataId = String(req.query.dataId ?? "").trim();
+
+  if (!dataId || !depth || !dataGubun) {
+    res.status(400).send("dataId, depth, dataGubun 값이 필요합니다.");
+    return;
+  }
+
+  const params = new URLSearchParams({
+    grpId: "",
+    itemId,
+    gubun,
+    depth,
+    cate1: "",
+    cate2: "",
+    dataGubun,
+    dataId,
+  });
+
+  const apiUrl = `https://db.itkc.or.kr/dir/node?${params.toString()}`;
+
+  try {
+    const apiResponse = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        Accept: "text/html,*/*",
+      },
+    });
+
+    const text = await apiResponse.text();
+
+    console.log("ITKC node request:", apiUrl);
+    console.log("ITKC node status:", apiResponse.status);
+    console.log("ITKC node preview:", text.slice(0, 300));
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(apiResponse.status).send(text);
+  } catch (error) {
+    console.error("ITKC node proxy failed:", error);
+    res.status(500).send("dir/node 호출에 실패했습니다.");
+  }
+});
+
+
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

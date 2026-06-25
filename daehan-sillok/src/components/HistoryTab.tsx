@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { HistoricalBook, HistoricalEvent } from "../types";
+import type { HistoricalBook, HistoricalEvent } from "../types";
 import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -12,11 +11,15 @@ import {
   LayoutGrid, 
   BookOpen, 
   MapPin, 
-  Sparkles,
-  HelpCircle,
-  TrendingUp,
-  Volume2
+  Sparkles
 } from "lucide-react";
+//----------------------------------------------------------- 조선왕조실록 연동
+import ClassicArchiveBrowser from "./ClassicArchiveBrowser";
+import ClassicRecordViewer from "./ClassicRecordViewer";
+import type { ClassicDateSelection, ClassicRecord } from "../types/classics";
+import { fetchItkcTreeNodes } from "../lib/itkcTreeApi";
+import type { ClassicTreeNode } from "../lib/itkcTreeParser";
+import { fetchItkcNodeArticles } from "../lib/itkcNodeApi";
 
 interface HistoryTabProps {
   onMapPlayerToggle?: (isActive: boolean) => void;
@@ -103,6 +106,29 @@ function convertBookRowsToBooks(
   }));
 }
 
+
+const buildClassicSelectionLabel = (selection: ClassicDateSelection) => {
+  const parts: string[] = [];
+
+  if (selection.kingName) parts.push(selection.kingName);
+  if (selection.reignYear) parts.push(`${selection.reignYear}년`);
+  if (selection.month) parts.push(`${selection.isLeapMonth ? "윤" : ""}${selection.month}월`);
+  if (selection.day) parts.push(`${selection.day}일`);
+
+  return parts.join(" ");
+};
+
+const makeClassicSelectionKey = (selection: ClassicDateSelection) => {
+  return [
+    selection.collectionId,
+    selection.kingName ?? "",
+    selection.reignYear ?? "",
+    selection.month ?? "",
+    selection.day ?? "",
+    selection.isLeapMonth ? "leap" : "normal",
+  ].join("|");
+};
+
 export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
   // Local state to manage toggled book selection for transit page
   const [activeBookId, setActiveBookId] = useState<string>("");
@@ -111,9 +137,6 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
   const [books, setBooks] = useState<HistoricalBook[]>([]); //3번 수정사항
   const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
   const [dbError, setDbError] = useState<string>("");
-  const navigate = useNavigate();
-
-
   // Toggle between transit select directory page and interactive map screen
   const [showMapPlayer, setShowMapPlayer] = useState<boolean>(false);
 
@@ -141,7 +164,7 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
   const [isMoving, setIsMoving] = useState(false);
   const [isWaitingBetweenMoves, setIsWaitingBetweenMoves] = useState(false);
   // 자동재생은 마지막 사건에서 처음으로 순간 점프하지 않고,
-  // 끝에 도달하면 방향을 반대로 바꿔 왕복 재생한다.
+  // 끝에 도달하면 방향을 반대로 바꿔 왕복 재생한다. <-- 왜 이딴 방식을...
   const playbackDirectionRef = useRef<1 | -1>(1);
 
   // Dynamic AI commentary states
@@ -156,10 +179,48 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+
+    //--------------------------------------------------------------국문종합DB 연결
   // Get active book and events
   const currentBook = books.find(b => b.id === activeBookId) || books[0];
   const events = currentBook ? currentBook.events : [];
   const currentEvent = events[activeIndex] || events[0];
+
+  const [classicSelection, setClassicSelection] = useState<ClassicDateSelection>({
+    collectionId: "joseon-sillok",
+    kingName: "",
+    reignYear: null,
+    month: null,
+    day: null,
+    isLeapMonth: false,
+  });
+
+  const [classicRecords, setClassicRecords] = useState<ClassicRecord[]>([]);
+  const [selectedClassicDataId, setSelectedClassicDataId] = useState<string | null>(null);
+  const [isLoadingClassic, setIsLoadingClassic] = useState(false);
+  const [classicError, setClassicError] = useState("");
+
+  const getClassicRecordId = (record: ClassicRecord) => {
+    return record.dataId ?? record.dci ?? record.id ?? "";
+  };
+
+  const selectedClassicRecord = classicRecords.find((record) => {
+    return getClassicRecordId(record) === selectedClassicDataId;
+  });
+
+  const isClassicRecordMode = Boolean(selectedClassicRecord);
+
+  const classicSearchInFlightKeyRef = useRef<string | null>(null);
+
+  const hasClassicDateSelection = Boolean(
+    classicSelection.kingName &&
+      classicSelection.reignYear &&
+      classicSelection.month &&
+      classicSelection.day
+  );
+
+  const classicSelectionLabel = buildClassicSelectionLabel(classicSelection);
+
 
   useEffect(() => {
     const loadHistoryData = async () => {
@@ -237,6 +298,126 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
     setAnimationProgress(0);
     playbackDirectionRef.current = 1;
   };
+
+  //--------------------------------------------한국 고전 종합 DB
+  const makeItkcNodeUrlFromTreeNode = (node: ClassicTreeNode) => {
+    const url = node.url.startsWith("?") ? node.url : `?${node.url}`;
+    return `https://db.itkc.or.kr/dir/node${url}`;
+  };
+
+  const convertTreeNodeToClassicRecord = (
+    node: ClassicTreeNode,
+    selection: ClassicDateSelection,
+    index: number
+  ): ClassicRecord => {
+    const label = buildClassicSelectionLabel(selection);
+    const sourceUrl = makeItkcNodeUrlFromTreeNode(node);
+
+    return {
+      id: node.dataId || `classic-article-${index}`,
+      dataId: node.dataId,
+      dci: node.dataId,
+      title: node.label || "제목 없음",
+      bookTitle: `${selection.kingName ?? ""}실록`,
+      volumeTitle: label,
+      category: "조선왕조실록",
+      itemId: "JT",
+      searchText: `${label} 수록 기사`,
+      sourceUrl,
+      raw: {
+        dataId: node.dataId,
+        label: node.label,
+        url: node.url,
+        sourceUrl,
+        depth: node.depth,
+        dataGubun: node.dataGubun,
+      },
+    };
+  };
+
+
+const handleSelectClassicDate = async (selection: ClassicDateSelection) => {
+  const requestKey = makeClassicSelectionKey(selection);
+
+  if (classicSearchInFlightKeyRef.current === requestKey) {
+    return;
+  }
+
+  classicSearchInFlightKeyRef.current = requestKey;
+
+  setClassicSelection(selection);
+  setIsLoadingClassic(true);
+  setClassicError("");
+  setSelectedClassicDataId(null);
+
+  try {
+    const label = buildClassicSelectionLabel(selection);
+    const dateNodeId = selection.dateNodeId;
+
+    console.log("선택값:", selection);
+    console.log("date node id:", dateNodeId);
+
+    if (!dateNodeId) {
+      setClassicRecords([]);
+      setClassicError("선택한 날짜의 고전종합DB 일자 노드 ID가 없습니다.");
+      return;
+    }
+
+    const articleNodes = await fetchItkcTreeNodes({
+      dataId: dateNodeId,
+      depth: 4,
+      dataGubun: "일",
+    });
+
+    console.log("개별 기사 노드:", articleNodes);
+
+    const articleDetails = await fetchItkcNodeArticles({
+      dataId: dateNodeId,
+      depth: 4,
+      dataGubun: "일",
+    });
+
+    console.log("개별 기사 본문:", articleDetails);
+
+    const detailMap = new Map(
+      articleDetails.map((detail) => [detail.dataId, detail])
+    );
+
+    const articleRecords = articleNodes.map((node, index) => {
+      const baseRecord = convertTreeNodeToClassicRecord(node, selection, index);
+      const detail = detailMap.get(node.dataId);
+
+      return {
+        ...baseRecord,
+        title: detail?.title || baseRecord.title,
+        searchText: detail?.bodyText || baseRecord.searchText,
+        raw: {
+          ...(baseRecord.raw ?? {}),
+          detail,
+        },
+      };
+    });
+
+    setClassicRecords(articleRecords);
+
+    if (articleRecords.length > 0) {
+      setSelectedClassicDataId(articleRecords[0].dataId ?? articleRecords[0].id);
+    } else {
+      setSelectedClassicDataId(null);
+      setClassicError(`${label}에 수록된 개별 기사를 찾지 못했습니다.`);
+    }
+  } catch (error) {
+    console.error("Classic article load failed:", error);
+    setClassicRecords([]);
+    setSelectedClassicDataId(null);
+    setClassicError("고전 원문 기사 목록을 불러오지 못했습니다.");
+  } finally {
+    classicSearchInFlightKeyRef.current = null;
+    setIsLoadingClassic(false);
+  }
+};
+
+//--------------------------------------------한국 고전 종합 DB 끝
 
   const getAnimatedEvent = (index: number): AnimatedHistoricalEvent | undefined => {
     return events[index] as AnimatedHistoricalEvent | undefined;
@@ -495,13 +676,21 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
     );
   }
 
+  if (!isLoadingDb && dbError && books.length === 0) {
+    return (
+      <div className="p-8 text-center text-[#D4AF37] font-serif">
+        {dbError}
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-[calc(100vh-80px)] relative text-[#F5F2ED] bg-[#1E0402] overflow-x-hidden" id="history-tab-outer-frame">
       <AnimatePresence mode="wait">
-        
-        // ==========================================
-        // VIEW A: Centered Book Card selection Page
-        // ==========================================
+        {/* ========================================== */}
+        {/* VIEW A: Centered Book Card selection Page */}
+        {/* ========================================== */}
+
         {!showMapPlayer ? (
           <motion.div
             key="selection-gateway-palace"
@@ -515,7 +704,6 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
             <div className="relative w-full">
               <AnimatePresence mode="wait">
                 {activeBookId === "" ? (
-                  /* Initial State: About 30 book cards beautifully arranged and centered */
                   <motion.div
                     key="full-library-deck"
                     initial={{ opacity: 0, scale: 0.98 }}
@@ -523,7 +711,6 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                     exit={{ opacity: 0, x: -100 }}
                     className="space-y-6"
                   >
-                    {/* Elegant Gyeongbokgung/Kyujanggak header styling - Only visible in card list overview */}
                     <div className="text-center space-y-2 border-b border-[#D4AF37]/20 pb-6 max-w-3xl mx-auto relative">
                       <span className="text-[9px] tracking-[0.3em] text-[#D4AF37] font-bold font-serif block uppercase">
                         [ Daehan SILLOK ]
@@ -556,10 +743,9 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                           }}
                           className="relative p-5 bg-[#310D0A] hover:bg-[#4E1712] border border-[#D4AF37]/25 hover:border-[#D4AF37]/80 rounded-none shadow-md cursor-pointer flex flex-col justify-between group overflow-hidden h-[178px] transition-all duration-300"
                         >
-                          {/* Imperial Golden corner accents */}
                           <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#D4AF37]/35 group-hover:border-[#D4AF37]" />
                           <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#D4AF37]/35 group-hover:border-[#D4AF37]" />
-                          
+
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-[9px] font-mono font-bold text-[#D4AF37] px-1.5 py-0.5 bg-[#1B0503] border border-[#D4AF37]/15">
@@ -567,14 +753,16 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                               </span>
                               <BookOpen className="w-3.5 h-3.5 text-[#D4AF37]/35 group-hover:text-[#D4AF37] transition-colors" />
                             </div>
+
                             <h4 className="text-xs sm:text-sm font-serif font-black text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1">
                               {book.title.split(" (")[0]}
                             </h4>
+
                             <p className="text-[10.5px] text-[#DEC5AC] line-clamp-3 leading-relaxed font-serif text-justify">
                               {book.description}
                             </p>
                           </div>
-                          
+
                           <div className="text-right text-[9.5px] text-[#D4AF37] font-serif pt-1 flex items-center justify-end gap-1 group-hover:translate-x-0.5 transition-transform">
                             <span>연대표 열람</span>
                             <span>→</span>
@@ -584,7 +772,6 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                     </div>
                   </motion.div>
                 ) : (
-                  /* SPLIT VIEW (Sliding layout): when a book card is clicked, layout splits: left column keeps the books list, right column slides in the events */
                   <motion.div
                     key="split-event-reveal"
                     initial={{ opacity: 0, x: 80 }}
@@ -593,129 +780,216 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                     transition={{ duration: 0.35, ease: "easeOut" }}
                     className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"
                   >
-                    {/* Left Column: Traditional Book Directory List (Compact side-rail) - Hidden on Mobile */}
-                    <div className="hidden lg:flex lg:col-span-4 bg-[#1F0705] border border-[#D4AF37]/25 p-4 flex-col justify-between h-[580px] rounded-none">
-                      <div className="space-y-3 flex-1 flex flex-col min-h-0">
-                        <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2.5">
+                    <div className="hidden lg:block lg:col-span-4 h-[580px] rounded-none">
+                      <div className="h-full flex flex-col gap-3">
+                        <div className="flex items-center justify-between border border-[#D4AF37]/25 bg-[#1F0705] px-4 py-3">
                           <span className="text-xs font-serif font-black text-[#D4AF37] flex items-center gap-1.5">
-                            <BookOpen className="w-4 h-4 text-[#D4AF37]" /> 보전 아카이브 서첩
+                            <BookOpen className="w-4 h-4 text-[#D4AF37]" />
+                            고전 원문 탐색 서첩
                           </span>
+
                           <button
                             onClick={() => {
                               setActiveBookId("");
+                              setClassicRecords([]);
+                              setClassicError("");
+                              setSelectedClassicDataId(null);
+                              setClassicSelection({
+                                collectionId: "joseon-sillok",
+                                kingName: "",
+                                reignYear: null,
+                                month: null,
+                                day: null,
+                                isLeapMonth: false,
+                              });
                             }}
                             className="px-2.5 py-1 bg-[#4E1712] hover:bg-[#8B2518] text-[#D4AF37] hover:text-white text-[10px] font-serif border border-[#D4AF37]/40 cursor-pointer flex items-center gap-1 transition-all"
                           >
                             <LayoutGrid className="w-3 h-3" /> [서서도첩]
                           </button>
                         </div>
-                        
-                        {/* Scrollable list of compact books for switching */}
-                        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar scrollbar-thin scrollbar-thumb-[#8B2518]">
-                          {books.map((book) => {
-                            const isSelected = activeBookId === book.id;
-                            return (
-                              <div
-                                key={book.id}
-                                onClick={() => {
-                                  setActiveBookId(book.id);
-                                  setActiveIndex(0);
-                                }}
-                                className={`p-2.5 border transition-all cursor-pointer rounded-none flex items-center justify-between ${
-                                  isSelected
-                                    ? "bg-[#4E1712] border-[#D4AF37] text-white"
-                                    : "bg-[#140403] border-[#D4AF37]/10 text-stone-300 hover:border-[#D4AF37]/45 hover:bg-[#2C0E0B]"
-                                }`}
-                              >
-                                <span className="text-[11.5px] font-serif font-bold truncate pr-3">
-                                  {book.title.split(" (")[0]}
-                                </span>
-                                <span className="text-[8.5px] font-mono text-[#D4AF37] flex-shrink-0">
-                                  [{book.dynasty}]
-                                </span>
-                              </div>
-                            );
-                          })}
+
+                        <div className="flex-1 min-h-0">
+                          <ClassicArchiveBrowser
+                            collectionId="joseon-sillok"
+                            onSelectDate={handleSelectClassicDate}
+                          />
                         </div>
                       </div>
                     </div>
 
-                    {/* Right Column (Slid In): Major Events List dynamically paired with the clicked book */}
                     <div className="lg:col-span-8 w-full bg-[#310D0A] border border-[#D4AF37]/25 p-5 flex flex-col justify-between h-[580px] rounded-none shadow-md">
                       <div className="space-y-4 flex-1 flex flex-col min-h-0">
-                        
                         <div className="flex justify-between items-start gap-4 border-b border-[#D4AF37]/20 pb-3">
                           <div className="flex items-center gap-3">
                             <button
                               onClick={() => {
                                 setActiveBookId("");
+                                setClassicRecords([]);
+                                setClassicError("");
+                                setSelectedClassicDataId(null);
+                                setClassicSelection({
+                                  collectionId: "joseon-sillok",
+                                  kingName: "",
+                                  reignYear: null,
+                                  month: null,
+                                  day: null,
+                                  isLeapMonth: false,
+                                });
                               }}
                               className="lg:hidden p-1 bg-[#4E1712] hover:bg-[#8B2518] text-[#D4AF37] hover:text-white border border-[#D4AF37]/35 rounded-none cursor-pointer flex items-center justify-center w-8 h-8 flex-shrink-0"
                               title="사서도첩 탭으로 가기"
                             >
                               <ChevronLeft className="w-5 h-5" />
                             </button>
+
                             <div>
                               <span className="text-[9px] text-[#D4AF37] font-black tracking-wider uppercase block">
                                 COURT CHRONICLES EVENT TIMELINE
                               </span>
                               <h3 className="text-base sm:text-lg font-serif font-black text-white mt-0.5">
-                                [{currentBook?.title.split(" (")[0]}] 수록 사건 전집 일록
+                                {hasClassicDateSelection
+                                  ? `[${classicSelectionLabel}] 원문 사건 전집 일록`
+                                  : `[${currentBook?.title.split(" (")[0]}] 수록 사건 전집 일록`}
                               </h3>
                             </div>
                           </div>
-                          <span className="text-xs font-mono text-[#D4AF37] bg-[#140403] px-2 py-1 border border-[#D4AF37]/20 flex-shrink-0">
-                            총 {events.length}건 수록
-                          </span>
+
+                        <span className="text-xs font-mono text-[#D4AF37] bg-[#140403] px-2 py-1 border border-[#D4AF37]/20 flex-shrink-0">
+                          총 {hasClassicDateSelection ? classicRecords.length : events.length}건 수록
+                        </span>
                         </div>
 
-
-                        {/* Grid of events inside this book */}
                         <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 custom-scrollbar">
-                          {events.map((evt, idx) => (
-                            <div
-                              key={evt.id}
-                              onClick={() => {
-                                setActiveIndex(idx);
-                                setShowMapPlayer(true);
-                              }}
-                              className="bg-[#1C0604] hover:bg-[#451410] p-4 border border-[#D4AF37]/15 hover:border-[#D4AF37] transition-all cursor-pointer group flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-                            >
-                              <div className="space-y-1.5 flex-1 pr-4">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[11px] text-[#D4AF37] font-serif font-black bg-[#310D0A] px-2 py-0.5 border border-[#D4AF37]/15">
-                                    {evt.dateStr}
-                                  </span>
-                                  <span className="text-[9px] px-1 bg-amber-950 text-[#D4AF37] border border-[#D4AF37]/20 font-bold">
-                                    {evt.category}
-                                  </span>
-                                </div>
-                                <h4 className="text-xs sm:text-sm font-serif font-black text-white group-hover:text-[#D4AF37] transition-colors">
-                                  {idx + 1}. {evt.title}
-                                </h4>
-                                <p className="text-[11px] text-[#CBD5E1] line-clamp-1 leading-relaxed">
-                                  {evt.description}
+                          {hasClassicDateSelection ? (
+                            isLoadingClassic ? (
+                              <div className="h-full min-h-[260px] flex items-center justify-center border border-[#D4AF37]/15 bg-[#1C0604]">
+                                <p className="text-xs text-[#D4AF37] font-serif font-black">
+                                  {classicSelectionLabel} 원문 사건을 불러오는 중입니다...
                                 </p>
                               </div>
-                              <button className="flex-shrink-0 bg-[#310D0A] text-[#D4AF37] group-hover:bg-[#8B2518] group-hover:text-white px-3 py-1.5 border border-[#D4AF37]/30 group-hover:border-[#D4AF37] cursor-pointer text-[10px] font-serif transition-all">
-                                지도 분석 보기 →
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                            ) : classicError ? (
+                              <div className="h-full min-h-[260px] flex items-center justify-center border border-[#D4AF37]/15 bg-[#1C0604] px-4 text-center">
+                                <p className="text-xs text-[#DEC5AC] font-serif leading-relaxed">
+                                  {classicError}
+                                </p>
+                              </div>
+                            ) : classicRecords.length > 0 ? (
+                             classicRecords.map((record, idx) => {
+                                const recordId = getClassicRecordId(record);
+                                const isSelected = selectedClassicDataId === recordId;
 
+                                return (
+                                  <div
+                                    key={recordId || idx}
+                                    onClick={() => {
+                                      setSelectedClassicDataId(recordId);
+                                      setShowMapPlayer(true);
+                                      setShowPopup(false);
+                                      setIsPlaying(false);
+                                    }}
+                                    className={`bg-[#1C0604] hover:bg-[#451410] p-4 border transition-all cursor-pointer group flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+                                      isSelected
+                                        ? "border-[#D4AF37]"
+                                        : "border-[#D4AF37]/15 hover:border-[#D4AF37]"
+                                    }`}
+                                  >
+                                    <div className="space-y-1.5 flex-1 pr-4 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[11px] text-[#D4AF37] font-serif font-black bg-[#310D0A] px-2 py-0.5 border border-[#D4AF37]/15">
+                                          {classicSelectionLabel}
+                                        </span>
+
+                                        <span className="text-[9px] px-1 bg-amber-950 text-[#D4AF37] border border-[#D4AF37]/20 font-bold">
+                                          원문
+                                        </span>
+                                      </div>
+
+                                      <h4 className="text-xs sm:text-sm font-serif font-black text-white group-hover:text-[#D4AF37] transition-colors line-clamp-2">
+                                        {idx + 1}. {record.title || "제목 없음"}
+                                      </h4>
+
+                                      <p className="text-[11px] text-[#CBD5E1] line-clamp-2 leading-relaxed">
+                                        {record.searchText ||
+                                          record.bookTitle ||
+                                          record.dataId ||
+                                          record.dci ||
+                                          "본문 미리보기가 없습니다."}
+                                      </p>
+
+                                      <p className="text-[9px] text-[#D4AF37]/55 font-mono break-all">
+                                        {record.dataId || record.dci}
+                                      </p>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setSelectedClassicDataId(recordId);
+                                        setShowMapPlayer(true);
+                                        setShowPopup(false);
+                                        setIsPlaying(false);
+                                      }}
+                                      className="flex-shrink-0 bg-[#310D0A] text-[#D4AF37] group-hover:bg-[#8B2518] group-hover:text-white px-3 py-1.5 border border-[#D4AF37]/30 group-hover:border-[#D4AF37] cursor-pointer text-[10px] font-serif transition-all"
+                                    >
+                                      사건 상세 보기 →
+                                    </button>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="h-full min-h-[260px] flex items-center justify-center border border-[#D4AF37]/15 bg-[#1C0604] px-4 text-center">
+                                <p className="text-xs text-[#DEC5AC] font-serif leading-relaxed">
+                                  {classicSelectionLabel}에 해당하는 원문 사건이 없습니다.
+                                </p>
+                              </div>
+                            )
+                          ) : (
+                            events.map((evt, idx) => (
+                              <div
+                                key={evt.id}
+                                onClick={() => {
+                                  setActiveIndex(idx);
+                                  setShowMapPlayer(true);
+                                }}
+                                className="bg-[#1C0604] hover:bg-[#451410] p-4 border border-[#D4AF37]/15 hover:border-[#D4AF37] transition-all cursor-pointer group flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+                              >
+                                <div className="space-y-1.5 flex-1 pr-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-[#D4AF37] font-serif font-black bg-[#310D0A] px-2 py-0.5 border border-[#D4AF37]/15">
+                                      {evt.dateStr}
+                                    </span>
+                                    <span className="text-[9px] px-1 bg-amber-950 text-[#D4AF37] border border-[#D4AF37]/20 font-bold">
+                                      {evt.category}
+                                    </span>
+                                  </div>
+
+                                  <h4 className="text-xs sm:text-sm font-serif font-black text-white group-hover:text-[#D4AF37] transition-colors">
+                                    {idx + 1}. {evt.title}
+                                  </h4>
+
+                                  <p className="text-[11px] text-[#CBD5E1] line-clamp-1 leading-relaxed">
+                                    {evt.description}
+                                  </p>
+                                </div>
+
+                                <button className="flex-shrink-0 bg-[#310D0A] text-[#D4AF37] group-hover:bg-[#8B2518] group-hover:text-white px-3 py-1.5 border border-[#D4AF37]/30 group-hover:border-[#D4AF37] cursor-pointer text-[10px] font-serif transition-all">
+                                  지도 분석 보기 →
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
-
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </motion.div>
+
         ) : (
-          // ==========================================
-          // VIEW B: Full Map Player Screen (Traditional)
-          // ==========================================
           <motion.div
             key="interactive-map-player-traditional"
             initial={{ opacity: 0 }}
@@ -923,41 +1197,45 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
               </AnimatePresence>
 
               {/* Right Sidebar: Hanji textured traditional details panel */}
-              {currentEvent && (
+              {(currentEvent || isClassicRecordMode) && (
                 <div 
                   className="absolute top-6 bottom-6 right-6 w-[360px] md:w-[380px] bg-[#FAF6EE] border-2 border-[#5C4033] z-40 p-5 flex flex-col justify-between overflow-y-auto pointer-events-auto shadow-2xl rounded-none shadow-amber-950/25"
                   id="desktop-history-sidebar"
                 >
                   <div className="space-y-4">
                     {/* Event metadata */}
-                    <div className="border-b border-[#5C4033]/20 pb-3">
+                    <div className="border-[#5C4033]/20">
                       <span className="text-[9.5px] font-black text-[#8B0000] tracking-widest uppercase block mb-1">
-                        기록 연대관 · 서기 {currentEvent.year}년
+                        {isClassicRecordMode
+                          ? "조선왕조실록 원문 기사"
+                          : `기록 연대관 · 서기 ${currentEvent?.year ?? ""}년`}
                       </span>
+
                       <h3 className="text-base font-serif font-black text-[#2C251F] leading-tight">
-                        {currentEvent.title}
+                        {isClassicRecordMode
+                          ? selectedClassicRecord?.title || "원문 기사"
+                          : currentEvent?.title ?? "사건 정보"}
                       </h3>
-                      <p className="text-xs font-serif text-[#8B0000] font-bold mt-1.5">
-                        {currentEvent.locationName} · {currentEvent.dateStr}
+
+                      <p className="text-xs font-serif text-[#8B0000] font-bold mt-1.5 break-all">
+                        {isClassicRecordMode
+                          ? `${classicSelectionLabel}`
+                          : `${currentEvent?.locationName ?? ""} · ${currentEvent?.dateStr ?? ""}`}
                       </p>
                     </div>
 
                     {/* Bullet summary of facts */}
-                    <div className="space-y-2 max-h-[170px] overflow-y-auto pr-1">
-                      <span className="text-[10px] font-black text-[#8B0000] tracking-widest font-serif block uppercase">
-                        사건 상세 정본 (詳細正本)
-                      </span>
-                      <ul className="space-y-1.5 text-xs text-[#3E352C] font-serif list-disc pl-4 leading-relaxed text-justify">
-                        {currentEvent.details.map((dt, i) => (
-                          <li key={i} className="marker:text-[#8B0000]">
-                            {dt}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    <ClassicRecordViewer
+                      currentEvent={currentEvent}
+                      selection={classicSelection}
+                      records={classicRecords}
+                      selectedDataId={selectedClassicDataId}
+                      isLoading={isLoadingClassic}
+                      error={classicError}
+                    />
 
                     {/* Next Event / Date Transition trigger */}
-                    {activeIndex < events.length - 1 && (
+                    {!isClassicRecordMode && activeIndex < events.length - 1 && (
                       <div className="border-t border-[#5C4033]/20 pt-3" id="desktop-next-event-transition-block">
                         <span className="text-[10px] font-black text-[#8B0000] tracking-widest font-serif block uppercase">
                           사건 탐독 검토 완료 (檢討畢)
@@ -1330,14 +1608,26 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                 <div className="border-b border-[#5C4033]/20 pb-2.5 flex flex-wrap justify-between items-center gap-2">
                   <div>
                     <span className="text-[8.5px] font-black text-[#8B0000] tracking-widest uppercase block mb-0.5">
-                      기록 연대관 · 서기 {currentEvent.year}년
+                      {isClassicRecordMode
+                        ? "조선왕조실록 원문 기사"
+                        : `기록 연대관 · 서기 ${currentEvent?.year ?? ""}년`}
                     </span>
-                    <h3 className="text-sm font-serif font-black text-[#2C251F] leading-tight">
-                      {currentEvent.title}
-                    </h3>
-                    <p className="text-[10px] font-serif text-[#8B0000] font-bold mt-1">
-                      {currentEvent.locationName} · {currentEvent.dateStr}
-                    </p>
+                      <h3 className="text-sm font-serif font-black text-[#2C251F] leading-tight">
+                        {isClassicRecordMode
+                          ? selectedClassicRecord?.title || "원문 기사"
+                          : currentEvent?.title ?? "사건 정보"}
+                      </h3>
+
+                      <p className="text-[10px] font-serif text-[#8B0000] font-bold mt-1 break-all">
+                        {isClassicRecordMode
+                          ? `${classicSelectionLabel} · ${
+                              selectedClassicRecord?.dataId ||
+                              selectedClassicRecord?.dci ||
+                              selectedClassicRecord?.id ||
+                              ""
+                            }`
+                          : `${currentEvent?.locationName ?? ""} · ${currentEvent?.dateStr ?? ""}`}
+                      </p>
                   </div>
 
                   <button
@@ -1353,21 +1643,30 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                 </div>
 
                 {/* Details list */}
-                <div className="space-y-1.5">
-                  <span className="text-[9px] font-black text-[#8B0000] tracking-widest font-serif block uppercase">
-                    사건 상세 정본 (詳細正本)
-                  </span>
-                  <ul className="space-y-1 text-xs text-[#3E352C] font-serif list-disc pl-4 leading-relaxed text-justify">
-                    {currentEvent.details.map((dt, i) => (
-                      <li key={`mobile-dt-${i}`} className="marker:text-[#8B0000]">
-                        {dt}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] font-black text-[#8B0000] tracking-widest font-serif block uppercase">
+                      사건 상세 정본 (詳細正本)
+                    </span>
+
+                    {isClassicRecordMode ? (
+                      <ul className="space-y-1 text-xs text-[#3E352C] font-serif list-disc pl-4 leading-relaxed text-justify">
+                        <li className="marker:text-[#8B0000]">
+                          {selectedClassicRecord?.title || "제목 없음"}
+                        </li>
+                      </ul>
+                    ) : (
+                      <ul className="space-y-1 text-xs text-[#3E352C] font-serif list-disc pl-4 leading-relaxed text-justify">
+                        {currentEvent.details.map((dt, i) => (
+                          <li key={`mobile-dt-${i}`} className="marker:text-[#8B0000]">
+                            {dt}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
 
                 {/* Next Event / Date Transition trigger */}
-                {activeIndex < events.length - 1 && (
+                {!isClassicRecordMode && activeIndex < events.length - 1 && (
                   <div className="border-t border-[#5C4033]/20 pt-2.5 pb-0.5" id="mobile-next-event-transition-block">
                     <span className="text-[9px] font-black text-[#8B0000] tracking-widest font-serif block uppercase">
                       사건 탐독 검토 완료 (檢討畢)

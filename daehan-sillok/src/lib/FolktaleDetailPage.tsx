@@ -1,7 +1,5 @@
 export default function FolktaleDetailPage() {
   return (
-    <div>
-      Folktale Detail Page
-    </div>
+    <div>Folktale Detail Page</div>
   );
 }

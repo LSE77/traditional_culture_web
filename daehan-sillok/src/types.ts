@@ -37,10 +37,5 @@ export interface MythicalCreature {
   description: string;
   habits: string; // 습성
   origin: string; // 출전 문헌
-  stats: {
-    mysticism: number; // 신비성 (0-100)
-    power: number;     // 위력
-    friendliness: number; // 인간 친화력
-  };
   glowingColor: string; // Accent color (e.g., cyan/teal-blue)
 }
