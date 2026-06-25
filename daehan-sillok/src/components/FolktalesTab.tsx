@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { MythicalCreature } from "../types";
-import { MYTHICAL_CREATURES } from "../data/myth/creatures";
 import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Sparkles,
-  MessageSquare,
   ChevronLeft,
   BookOpen,
   Palette,
@@ -172,19 +169,25 @@ export default function FolktalesTab() {
         if (error) throw error;
 
         if (!data || data.length === 0) {
-          setCreatures(MYTHICAL_CREATURES as ExtendedCreature[]);
-          setDbError("Supabase에 설화 데이터가 없어 기존 data.ts 전승 자료를 표시합니다.");
+          // setCreatures(MYTHICAL_CREATURES as ExtendedCreature[]);
+          setDbError("Supabase에 설화 데이터가 없어.");
           return;
         }
 
         setCreatures(convertRowsToCreatures(data as MythicalCreatureRow[]));
       } catch (error) {
         console.error("Supabase mythical_creatures load failed:", error);
-        setCreatures(MYTHICAL_CREATURES as ExtendedCreature[]);
-        setDbError("Supabase 설화 데이터를 불러오지 못해 기존 data.ts 전승 자료를 표시합니다.");
+        // setCreatures(MYTHICAL_CREATURES as ExtendedCreature[]);
+        setDbError("error");
       } finally {
         setIsLoadingDb(false);
       }
+
+      // setCreatures(converted);
+
+      // if (converted.length > 0 && !selectedId) {
+      //   setSelectedId(converted[0].id);
+      // }
     };
 
     loadCreatures();
@@ -356,6 +359,21 @@ export default function FolktalesTab() {
       );
     });
   };
+  
+  // if (isLoadingDb && creatures.length === 0) {
+  //   return (
+  //     <div className="min-h-[70vh] flex items-center justify-center bg-[#0b1619] text-[#E0F7F6]">
+  //       {/* <div className="text-center"> */}
+  //         <div className="text-lg font-serif mb-2">
+  //           설화 자료를 불러오는 중...
+  //         </div>
+  //         <div className="text-sm text-[#00CDAC]/75">
+  //           전승 기록을 조회하고 있습니다.
+  //         </div>
+  //       {/* </div> */}
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="relative min-h-[calc(100vh-80px)] overflow-hidden bg-[#071012]" id="folktales-tab-layout">
@@ -482,7 +500,7 @@ export default function FolktalesTab() {
             {dbError && <p className="text-[10px] text-amber-300 font-serif leading-relaxed">{dbError}</p>}
           </div>
 
-          <div className="flex flex-col gap-1.5 max-h-[350px] overflow-y-auto pr-1">
+          <div className="flex flex-col gap-1.5 max-h-[350px] overflow-y-auto scrollbar-hide pr-1">
             {categories.map((cat) => {
               const isActive = activeCategory === cat && !searchQuery.trim();
               return (
@@ -532,7 +550,6 @@ export default function FolktalesTab() {
 
                     <div className="space-y-6">
                       <div className="border-b border-[#008B8B]/20 pb-4 text-center font-serif">
-                        <span className="text-[8px] text-[#00FA9A] font-black tracking-widest uppercase">대각서 전승 영무기록첩</span>
                         <h2 className="text-xl sm:text-2xl font-serif font-black text-white mt-1">{selectedCreature.name}</h2>
                         <p className="text-[11.5px] text-[#00CDAC] mt-1 font-serif italic text-center">“ {selectedCreature.tagline} ”</p>
                       </div>
@@ -545,7 +562,7 @@ export default function FolktalesTab() {
 
                       <div className="space-y-2 relative group-content">
                         <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-black font-serif text-[#00FA9A] border-l-2 border-[#00FA9A] pl-1.5 block">[전승 개요 고찰]</span>
+                          <span className="text-[9px] font-black font-serif text-[#00FA9A] border-l-2 border-[#00FA9A] pl-1.5 block">개요</span>
                           <button
                             onClick={() => setShowIllustration(true)}
                             className="flex items-center gap-1 text-[10px] font-serif font-black text-[#00FA9A] hover:text-white border border-[#00FA9A]/30 hover:border-[#00FA9A] px-2 py-0.5 bg-[#0C1F24] transition-all duration-300 cursor-pointer rounded-none active:scale-95"
@@ -560,7 +577,7 @@ export default function FolktalesTab() {
                       </div>
 
                       <div className="space-y-2 pt-1">
-                        <span className="text-[9px] font-black font-serif text-[#FF5E62] border-l-2 border-[#FF5E62] pl-1.5 block">[성조 및 도학적 성격]</span>
+                        <span className="text-[9px] font-black font-serif text-[#FF5E62] border-l-2 border-[#FF5E62] pl-1.5 block">특징</span>
                         <p className="text-xs sm:text-sm text-[#D1EAE9] font-serif leading-relaxed text-justify font-medium">
                           {toPlainText(selectedCreature.habits)}
                         </p>
@@ -604,14 +621,14 @@ export default function FolktalesTab() {
                       <div className="border-t border-[#008B8B]/20 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-serif">
                         <button
                           onClick={() => setShowManuscript(true)}
-                          className="text-stone-300 hover:text-[#00FA9A] font-medium flex items-center gap-1.5 border border-[#008B8B]/20 hover:border-[#00FA9A]/60 px-2.5 py-1.5 bg-[#0C1F24] transition-all cursor-pointer rounded-none group text-left"
+                          className="max-w-[465px] text-stone-300 hover:text-[#00FA9A] font-medium flex items-center gap-1.5 border border-[#008B8B]/20 hover:border-[#00FA9A]/60 px-2.5 py-1.5 bg-[#0C1F24] transition-all cursor-pointer rounded-none group text-left"
                         >
                           <BookOpen className="w-3.5 h-3.5 text-[#00FA9A] group-hover:scale-110 transition-transform" />
                           <span>
-                            <strong>참조 출전:</strong> <span className="underline decoration-dotted text-[#00FA9A] font-bold">{selectedCreature.origin}</span> [고서 眞本고찰 ☞]
+                            <strong>참조:</strong> <span className="underline decoration-dotted text-[#00FA9A] font-bold">{selectedCreature.origin}</span>
                           </span>
                         </button>
-                        <span className="text-[#00FA9A]/95 text-[10px] font-bold self-start sm:self-center">[전승 정식 분류: {selectedCreature.category}]</span>
+                        <span className="text-[#00FA9A]/95 text-[10px] font-bold self-start sm:self-center">[{selectedCreature.category}]-</span>
                       </div>
                     </div>
                   </div>
@@ -621,9 +638,9 @@ export default function FolktalesTab() {
                   <div className="bg-[#0B1619] border border-[#008B8B]/25 p-5 text-neutral-200 rounded-none flex-1 flex flex-col justify-between shadow-sm">
                     <div className="space-y-4 flex-1 flex flex-col justify-between">
                       <div className="space-y-2 pb-3 border-b border-[#008B8B]/25">
-                        <span className="text-[8px] text-[#00FA9A] tracking-wider uppercase block font-black">SCHOLARLY CHAT FORUM</span>
-                        <h4 className="text-xs sm:text-sm font-serif font-black text-white">대제학 AI 실시간 심의 자문</h4>
-                        <p className="text-[10px] text-neutral-400 font-serif leading-relaxed">문헌 속 신수 영물에 대한 철학적 비평이나 역학을 사관에게 상세히 상고해 보실 수 있습니다.</p>
+                        <span className="text-[8px] text-[#00FA9A] tracking-wider uppercase block font-black">AI CHAT FORM</span>
+                        <h4 className="text-xs sm:text-sm font-serif font-black text-white">AI 심의 자문</h4>
+                        <p className="text-[10px] text-neutral-400 font-serif leading-relaxed">문헌 속 신수 영물에 대한 상세 정보나 역학을 AI에게 상세히 알아보실 수 있습니다.</p>
                       </div>
 
                       <div className="flex-1 my-3 overflow-y-auto max-h-[280px] bg-[#050D0E] p-3 border border-[#008B8B]/15 space-y-4">
@@ -631,11 +648,11 @@ export default function FolktalesTab() {
                           qaThread.map((thread, idx) => (
                             <div key={idx} className="space-y-2 text-xs">
                               <div className="bg-[#0E262E] p-2 border-l border-[#00FA9A]/40">
-                                <p className="text-[9px] text-[#00FA9A] font-serif font-bold uppercase mb-1">[자문 원문 질의]</p>
+                                <p className="text-[9px] text-[#00FA9A] font-serif font-bold uppercase mb-1">자문 원문 질의</p>
                                 <p className="text-neutral-200 font-serif font-semibold">{thread.q}</p>
                               </div>
                               <div className="p-2 space-y-1 bg-[#101F24]/50">
-                                <p className="text-[9px] text-neutral-400 font-serif font-bold uppercase">[사관 AI 비평 답신]</p>
+                                <p className="text-[9px] text-neutral-400 font-serif font-bold uppercase">AI 자문 답신</p>
                                 <div className="text-neutral-300 font-serif">{renderFormattedMarkdown(thread.a)}</div>
                               </div>
                             </div>
@@ -649,7 +666,7 @@ export default function FolktalesTab() {
 
                         {isAskingAI && (
                           <div className="p-3 bg-[#0E262E] border border-[#00FA9A]/20 animate-pulse text-center">
-                            <span className="text-[10px] text-[#00FA9A] font-serif font-black">고문서를 추종하며 분석을 조율하고 있습니다...</span>
+                            <span className="text-[10px] text-[#00FA9A] font-serif font-black">고문서를 분석하고 있습니다...</span>
                           </div>
                         )}
 
@@ -670,7 +687,7 @@ export default function FolktalesTab() {
                           disabled={isAskingAI || !userQuery.trim()}
                           className="w-full py-1.5 bg-[#008B8B] hover:bg-[#00FA9A] hover:text-neutral-950 text-neutral-100 font-serif font-black text-xs rounded-none border border-[#00FA9A]/15 cursor-pointer disabled:opacity-40 transition-all text-center"
                         >
-                          {isAskingAI ? "비평 주석 검토 중..." : "[대제학 AI 주론 질의송부]"}
+                          {isAskingAI ? "비평 주석 검토 중..." : "[AI 주론 질의송부]"}
                         </button>
                       </form>
                     </div>
@@ -682,7 +699,7 @@ export default function FolktalesTab() {
                 key="empty-parchment-guide-cards"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="w-full min-h-[500px] bg-[#0A181C] border border-[#008B8B]/20 rounded-none p-6 flex flex-col justify-between"
+                className="w-full min-h-[660px] bg-[#0A181C] border border-[#008B8B]/20 rounded-none p-6 flex flex-col justify-between"
               >
                 <div className="space-y-5">
                   <div className="flex flex-col gap-4 border-b border-[#008B8B]/20 pb-4 lg:hidden">
@@ -705,13 +722,13 @@ export default function FolktalesTab() {
                       </h3>
                       <p className="text-xs text-neutral-400 font-serif leading-relaxed mt-0.5">
                         {searchQuery.trim()
-                          ? "Supabase 전승록의 이름, 외형, 설명, 키워드에서 검색한 결과입니다."
-                          : "민간 구전서와 전적 속 수록된 대상을 아래 카드에서 선택하여 상세 기원과 비평 서화를 펼쳐 보십시오."}
+                          ? "전승록의 이름, 외형, 설명, 키워드에서 검색한 결과입니다."
+                          : "민간 구전서와 전적 속 수록된 대상을 아래 카드에서 선택하여 상세 기원과 비평을 펼쳐 보십시오."}
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[520px] overflow-y-auto scrollbar-hide pr-1 pt-1">
                     {filteredCreatures.length > 0 ? (
                       filteredCreatures.map((item) => (
                         <motion.div
@@ -764,14 +781,14 @@ export default function FolktalesTab() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto scrollbar-hide"
             onClick={() => setShowManuscript(false)}
           >
             <motion.div
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
-              className="w-full max-w-4xl bg-[#130E09] border-[3px] border-[#D4AF37]/50 rounded-none p-6 md:p-8 text-[#FAF6EE] shadow-2xl relative overflow-hidden"
+              className="w-full max-w-4xl bg-[#130E09] border-[3px] border-[#D4AF37]/50 rounded-none p-6 md:p-8 text-[#FAF6EE] shadow-2xl relative overflow-hidden scrollbar-hide"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="absolute inset-0 opacity-10 pointer-events-none mix-blend-overlay bg-repeat bg-[radial-gradient(#FAF6EE_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -779,16 +796,15 @@ export default function FolktalesTab() {
                 onClick={() => setShowManuscript(false)}
                 className="absolute top-4 right-4 text-xs font-serif text-[#D4AF37] hover:text-white border border-[#D4AF37]/35 hover:border-[#D4AF37] px-3 py-1 bg-[#251A11] cursor-pointer transition-colors z-40"
               >
-                ✕ [서기비급 닫기]
+                ✕ 서기비급 닫기
               </button>
 
               <div className="border-b border-[#D4AF37]/35 pb-4 mb-6 font-serif">
-                <span className="text-[10px] text-[#D4AF37] font-black tracking-widest uppercase block mb-1">사서 수록 원장 고찰 (史書收錄 眞本)</span>
+                <span className="text-[10px] text-[#D4AF37] font-black tracking-widest uppercase block mb-1">출처</span>
                 <h2 className="text-2xl md:text-3xl font-serif font-black text-[#F5F2ED] tracking-tight">전승 고문서록</h2>
                 <p className="text-[12px] text-stone-400 mt-1 flex flex-wrap items-center gap-1.5">
-                  <span>참조 출전 비급: </span>
+                  <span>참조:</span>
                   <span className="text-[#D4AF37] font-bold underline underline-offset-2">{selectedCreature.origin}</span>
-                  <span>· 정식 가상 학술 정본 고해</span>
                 </p>
               </div>
 
@@ -801,7 +817,7 @@ export default function FolktalesTab() {
                     </span>
                   </div>
 
-                  <div className="space-y-4">
+                  {/* <div className="space-y-4">
                     <span className="text-[10px] uppercase tracking-wider text-stone-500 font-bold block border-b border-stone-800 pb-1">사건 발생 대역순 (年代順)</span>
                     <div className="space-y-4 relative pl-3 border-l border-[#D4AF37]/20">
                       {[
@@ -816,7 +832,7 @@ export default function FolktalesTab() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="md:col-span-9 space-y-4 max-h-[380px] overflow-y-auto pr-1">
@@ -856,7 +872,7 @@ export default function FolktalesTab() {
                         className="flex items-center gap-1 text-[10.5px] font-sans font-bold text-[#D4AF37] hover:text-[#FAF6EE] border border-[#D4AF37]/30 hover:border-[#D4AF37] px-2.5 py-1 bg-[#150F0A] cursor-pointer transition-all rounded-none"
                       >
                         <Palette className="w-3.5 h-3.5 text-[#D4AF37]" />
-                        <span>[그림 화첩 보기]</span>
+                        <span>그림 보기</span>
                       </button>
                     </div>
                     <p className="font-serif leading-relaxed text-justify text-[#D1C6A5] text-sm sm:text-base tracking-wide font-medium">

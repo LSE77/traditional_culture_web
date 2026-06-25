@@ -81,11 +81,6 @@ export default function Header() {
             대한실록
           </h1>
 
-          <p
-            className={`text-[9px] font-sans font-medium tracking-wide ${styles.textSecondary}`}
-          >
-            역사와 신비의 기록 아카이브
-          </p>
         </div>
       </div>
 

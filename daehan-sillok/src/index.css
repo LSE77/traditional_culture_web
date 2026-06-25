@@ -49,3 +49,51 @@
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+  border: 1px solid var(--scrollbar-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+body.theme-home {
+  --scrollbar-track: #14110f;
+  --scrollbar-thumb: #dcd4c4;
+  --scrollbar-thumb-hover: #d4af37;
+  --scrollbar-border: rgba(212, 175, 55, 0.2);
+}
+
+body.theme-history {
+  --scrollbar-track: #1e0402;
+  --scrollbar-thumb: #8b2518;
+  --scrollbar-thumb-hover: #d4af37;
+  --scrollbar-border: rgba(212, 175, 55, 0.25);
+}
+
+body.theme-folktales {
+  --scrollbar-track: #0b1619;
+  --scrollbar-thumb: #008b8b;
+  --scrollbar-thumb-hover: #00fa9a;
+  --scrollbar-border: rgba(0, 250, 154, 0.25);
+}

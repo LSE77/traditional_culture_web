@@ -1,17 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { HistoricalBook } from "../types";
 import { HISTORICAL_BOOKS } from "../data/history/book";
 import { motion, AnimatePresence } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-interface HomeTabProps {
-  onSelectBook: (bookId: string) => void;
-  onNavigateToFolktales: () => void;
-}
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
 
 export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTabProps) {
-  const [activeChapter, setActiveChapter] = useState<number>(0);
-
   const chapters = [
     {
       title: "제1장: 대한실록의 문을 열며",
@@ -61,6 +57,9 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
     }
   ];
 
+  const [activeChapter, setActiveChapter] = useState(0);
+  const current = chapters[activeChapter];
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -79,217 +78,283 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
     setActiveChapter((prev) => (prev - 1 + chapters.length) % chapters.length);
   };
 
-  const current = chapters[activeChapter];
+  const [books, setBooks] = useState<HistoricalBook[]>([]);
+  const [isLoadingBooks, setIsLoadingBooks] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadHomeBooks = async () => {
+      setIsLoadingBooks(true);
+
+      try {
+        const { data: bookRows, error: bookError } = await supabase
+          .from("historical_books")
+          .select("*")
+          .order("sort_order", { ascending: true });
+
+        if (bookError) {
+          throw bookError;
+        }
+
+        const { data: eventRows, error: eventError } = await supabase
+          .from("historical_events")
+          .select("*")
+          .order("sort_order", { ascending: true });
+
+        if (eventError) {
+          throw eventError;
+        }
+
+        if (!bookRows || bookRows.length === 0) {
+          setBooks(HISTORICAL_BOOKS);
+          return;
+        }
+
+        const convertedBooks: HistoricalBook[] = bookRows.map((book) => {
+          const events = (eventRows || [])
+            .filter((event) => event.book_id === book.id)
+            .map((event) => ({
+              id: event.id,
+              title: event.title,
+              year: event.year,
+              dateStr: event.date_str,
+              mapX: event.map_x,
+              mapY: event.map_y,
+              locationName: event.location_name,
+              description: event.description,
+              details: event.details || [],
+              category: event.category,
+              iconName: event.icon_name,
+            }));
+
+          return {
+            id: book.id,
+            title: book.title,
+            dynasty: book.dynasty,
+            description: book.description,
+            coverColor: book.cover_color || "from-[#471E19] to-[#250906]",
+            accentColor: book.accent_color || "#D4AF37",
+            events,
+          };
+        });
+
+        setBooks(convertedBooks);
+      } catch (error) {
+        console.error("HomeTab historical books load failed:", error);
+        setBooks(HISTORICAL_BOOKS);
+      } finally {
+        setIsLoadingBooks(false);
+      }
+    };
+
+    loadHomeBooks();
+  }, []);
+
 
   return (
     <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-      className="max-w-6xl mx-auto px-4 py-8 sm:py-12 space-y-12"
-      id="home-tab-container"
+    initial="hidden"
+    animate="visible"
+    variants={containerVariants}
+    className="max-w-6xl mx-auto px-4 py-8 sm:py-12 space-y-12"
+    id="home-tab-container"
     >
-      {/* 1. Multi-Page Comprehensive Site Overview Slider (Unboxed, full span layout) */}
-      <motion.div 
-        variants={itemVariants}
-        className="w-full py-2 space-y-8 relative overflow-hidden"
-        id="home-info-multi-page-board"
-      >
-        {/* Header Indicator */}
-        <div className="flex flex-wrap justify-between items-center border-b border-[#D4AF37]/20 pb-4 relative z-10 gap-2">
-          <div className="flex items-center gap-1.5">
-            {chapters.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveChapter(idx)}
-                className={`h-1.5 rounded-none transition-all duration-300 ${
-                  activeChapter === idx ? "w-8 bg-[#D4AF37]" : "w-2 bg-neutral-750 hover:bg-neutral-605"
-                }`}
-                aria-label={`Go to section ${idx + 1}`}
-              />
-            ))}
-          </div>
-        </div>
 
-        {/* Content Slider with AnimatePresence Overlay Transit */}
-        <div className="relative h-[520px] sm:h-[400px] md:h-[300px] w-full overflow-hidden z-10 flex items-center">
-          {/* LEFT COLUMN BUTTON OR INNER SLIDE FOR COMPREHENSIVE CONTROL */}
-          <div className="absolute left-0 z-30 pointer-events-auto">
+    {/* 1. Multi-Page Comprehensive Site Overview Slider (Unboxed, full span layout) */}
+
+    <motion.div 
+      variants={itemVariants}
+      className="w-full py-2 space-y-8 relative overflow-hidden"
+      id="home-info-multi-page-board"
+    >
+      {/* Header Indicator */}
+      <div className="flex flex-wrap justify-between items-center border-b border-[#D4AF37]/20 pb-4 relative z-10 gap-2">
+        <div className="flex items-center gap-1.5">
+          {chapters.map((_, idx) => (
             <button
-              onClick={prevChapter}
-              className="p-2 sm:p-3 bg-[#2E1E1C]/80 hover:bg-[#8B2518] text-[#D4AF37] hover:text-white border border-[#D4AF37]/25 rounded-none shadow-md transition-all cursor-pointer"
-              title="이전 전시실"
-              aria-label="Previous Chapter"
-            >
-              <ChevronLeft className="w-5 h-5 sm:w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="w-full h-full px-12 sm:px-14 relative">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={activeChapter}
-                initial={{ opacity: 0, x: 40 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -40 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="absolute inset-x-12 sm:inset-x-14 inset-y-0 grid grid-cols-1 md:grid-cols-12 gap-6 items-start bg-[#1E0402]/30 p-4 border border-[#D4AF37]/10"
-                id="home-pagination-chapter-card"
-              >
-                {/* Left Column - Main Callouts */}
-                <div className="md:col-span-4 space-y-4 mt-1">
-                  <span className="text-xs font-serif text-[#D4AF37] font-bold block bg-[#2E251E] px-3 py-1 rounded-none w-fit border border-[#D4AF37]/10">
-                    {current.title}
-                  </span>
-                  <h3 className="text-base sm:text-xl md:text-2xl font-serif font-black text-[#F5F2ED] leading-tight">
-                    {current.heading}
-                  </h3>
-                </div>
-
-                {/* Right Column - Elaborate Texts / Brief Duties */}
-                <div className="md:col-span-8 space-y-4 border-l border-neutral-800 md:pl-6 mt-1">
-                  <div className="space-y-3 text-xs sm:text-sm text-neutral-300 font-serif leading-relaxed text-justify">
-                    {current.content.map((p, pIdx) => (
-                      <p key={pIdx}>{p}</p>
-                    ))}
-                  </div>
-
-                  {current.roleInfo && (
-                    <div className="p-3 rounded-none bg-[#251E1A] border-l-2 border-[#D4AF37] border-y border-r border-neutral-800">
-                      <span className="text-[10px] text-[#D4AF37] font-sans font-bold uppercase tracking-wider block mb-0.5">
-                        역할 관리 안내
-                      </span>
-                      <p className="text-xs text-neutral-300 font-serif font-medium leading-relaxed">
-                        {current.roleInfo}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          <div className="absolute right-0 z-30 pointer-events-auto">
-            <button
-              onClick={nextChapter}
-              className="p-2 sm:p-3 bg-[#2E1E1C]/80 hover:bg-[#8B2518] text-[#D4AF37] hover:text-white border border-[#D4AF37]/25 rounded-none shadow-md transition-all cursor-pointer"
-              title="다음 전시실"
-              aria-label="Next Chapter"
-            >
-              <ChevronRight className="w-5 h-5 sm:w-6 h-6" />
-            </button>
-          </div>
+              key={idx}
+              onClick={() => setActiveChapter(idx)}
+              className={`h-1.5 rounded-none transition-all duration-300 ${
+                activeChapter === idx ? "w-8 bg-[#D4AF37]" : "w-2 bg-neutral-750 hover:bg-neutral-605"
+              }`}
+              aria-label={`Go to section ${idx + 1}`}
+            />
+          ))}
         </div>
+      </div>
 
-      </motion.div>
-
-      {/* Decorative Traditional Banner */}
-      <motion.div
-        variants={itemVariants}
-        className="relative bg-gradient-to-r from-[#1C1816] to-[#14110F] border border-[#D4AF37]/15 rounded-none p-6 shadow-sm overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left"
-      >
-        <div className="space-y-1">
-          <p className="text-lg font-serif text-[#F2ECE4] font-bold">
-            “역사는 흘러가 사라지는 과거의 낙엽이 아닙니다. 오늘날 우리의 마음을 비추는 거룩한 거울입니다.”
-          </p>
-        </div>
-        <div className="flex gap-4">
+      {/* Content Slider with AnimatePresence Overlay Transit */}
+      <div className="relative h-[520px] sm:h-[400px] md:h-[300px] w-full overflow-hidden z-10 flex items-center">
+        <div className="absolute left-0 z-30 pointer-events-auto">
           <button
-            onClick={() => onSelectBook("annals")}
-            className="px-5 py-2.5 bg-[#D4AF37] hover:bg-[#BCA02B] text-neutral-900 text-xs font-serif font-black rounded-none transition-all shadow-sm cursor-pointer"
+            onClick={prevChapter}
+            className="p-2 sm:p-3 bg-[#2E1E1C]/80 hover:bg-[#8B2518] text-[#D4AF37] hover:text-white border border-[#D4AF37]/25 rounded-none shadow-md transition-all cursor-pointer"
+            title="이전 전시실"
+            aria-label="Previous Chapter"
           >
-            기록선 열람
-          </button>
-          <button
-            onClick={onNavigateToFolktales}
-            className="px-5 py-2.5 border border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:bg-neutral-800 text-xs font-serif font-bold rounded-none transition-all cursor-pointer"
-          >
-            설화 비평
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
-      </motion.div>
 
-      {/* 2. Book List / Classical Cover Library Grid */}
-      <div className="space-y-8" id="home-book-covers-section">
-        <motion.div variants={itemVariants} className="text-center space-y-2">
-          <h3 className="text-xl sm:text-2xl font-serif font-black text-[#F5F2ED]">
-            보관각 서서 선집
-          </h3>
-          <p className="text-xs sm:text-sm text-[#D4AF37]/80 font-serif font-semibold">
-            대한의 소중한 기록 유산과 전승 목록이 보관되어 있습니다. 서고를 열고 지도 추적기를 구동해 주십시오.
-          </p>
-        </motion.div>
-
-        <motion.div 
-          variants={containerVariants}
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 justify-items-center"
-        >
-          {HISTORICAL_BOOKS.map((book) => (
+        <div className="w-full h-full px-12 sm:px-14 relative">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={book.id}
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              onClick={() => onSelectBook(book.id)}
-              className="w-full max-w-[280px] aspect-[3/4] rounded-none p-5 flex flex-col justify-between cursor-pointer relative shadow-md border-l-4 border-[#2C1A04] overflow-hidden group bg-gradient-to-br"
-              style={{
-                backgroundImage: "linear-gradient(135deg, #1E1B18 0%, #151210 100%)",
-                borderRight: `0.5px solid rgba(212, 175, 55, 0.15)`,
-                borderTop: `0.5px solid rgba(212, 175, 55, 0.15)`,
-                borderBottom: `0.5px solid rgba(212, 175, 55, 0.15)`
-              }}
-              id={`book-cover-${book.id}`}
+              key={activeChapter}
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="absolute inset-x-12 sm:inset-x-14 inset-y-0 grid grid-cols-1 md:grid-cols-12 gap-6 items-start bg-[#1E0402]/30 p-4 border border-[#D4AF37]/10"
+              id="home-pagination-chapter-card"
             >
-              {/* Spine edge effect */}
-              <div className="absolute inset-y-0 left-0 w-[0.5px] bg-black/40" />
-              <div className="absolute inset-y-0 left-[2px] w-[0.5px] bg-neutral-800/20" />
-              
-              {/* Traditional book corner brass brackets (pure CSS styling) */}
-              <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#D4AF37]/20 rounded-none" />
-              <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#D4AF37]/20 rounded-none" />
-
-              {/* Thread-binding loops representation typical for Joseon books */}
-              <div className="absolute left-[8px] inset-y-0 flex flex-col justify-between py-8 pointer-events-none">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="w-2.5 h-[1.5px] bg-[#D4AF37]/20 rounded-none border border-black/30" />
-                ))}
-              </div>
-
-              {/* Book Header Label */}
-              <div className="pl-6 pt-2 flex justify-between items-start">
-                <span className="text-[9px] uppercase tracking-widest font-sans text-[#D4AF37] font-bold border border-[#D4AF37]/15 px-1.5 py-0.5 rounded-none bg-[#251F1A]">
-                  {book.dynasty}
+              <div className="md:col-span-4 space-y-4 mt-1">
+                <span className="text-xs font-serif text-[#D4AF37] font-bold block bg-[#2E251E] px-3 py-1 rounded-none w-fit border border-[#D4AF37]/10">
+                  {current.title}
                 </span>
-                <span className="text-[10px] text-neutral-400 font-bold flex items-center gap-1 font-serif">
-                  {book.events.length}건 수록
-                </span>
+                <h3 className="text-base sm:text-xl md:text-2xl font-serif font-black text-[#F5F2ED] leading-tight">
+                  {current.heading}
+                </h3>
               </div>
 
-              {/* Vertical Title Area in the center */}
-              <div className="flex justify-center my-6">
-                <div className="px-3.5 py-6 bg-[#161311] text-[#E8E3D9] border border-[#D4AF37]/15 rounded-none shadow-inner flex flex-col items-center gap-2 group-hover:bg-[#1C1815] transition-colors min-h-[160px] justify-center">
-                  <h4 className="text-base sm:text-lg font-serif font-black tracking-wider text-center break-all [writing-mode:vertical-rl] leading-none text-[#F2ECE4]">
-                    {book.title.split(" (")[0]}
-                  </h4>
-                  <span className="text-[9px] text-[#D4AF37] border-t border-[#D4AF37]/15 pt-1 mt-1 font-serif font-bold">
-                    기록서
-                  </span>
+              <div className="md:col-span-8 space-y-4 border-l border-neutral-800 md:pl-6 mt-1">
+                <div className="space-y-3 text-xs sm:text-sm text-neutral-300 font-serif leading-relaxed text-justify">
+                  {current.content.map((p, pIdx) => (
+                    <p key={pIdx}>{p}</p>
+                  ))}
                 </div>
-              </div>
 
-              {/* Book Footer Summary Description */}
-              <div className="pl-6 pb-2 space-y-2">
-                <p className="text-[10px] text-neutral-400 line-clamp-2 font-serif group-hover:text-neutral-200 transition-colors font-medium">
-                  {book.description.replace("이옵니다.", "입니다.").replace("가득하옵니다.", "가득하기 때문입니다.")}
-                </p>
-                <div className="flex items-center gap-1 text-[10px] font-bold text-[#D4AF37] group-hover:text-[#F2ECE4] transition-all">
-                  <span>지도에서 정밀 열람</span>
-                  <span className="ml-1 group-hover:translate-x-1 transition-transform">→</span>
-                </div>
+                {current.roleInfo && (
+                  <div className="p-3 rounded-none bg-[#251E1A] border-l-2 border-[#D4AF37] border-y border-r border-neutral-800">
+                    <span className="text-[10px] text-[#D4AF37] font-sans font-bold uppercase tracking-wider block mb-0.5">
+                      역할 관리 안내
+                    </span>
+                    <p className="text-xs text-neutral-300 font-serif font-medium leading-relaxed">
+                      {current.roleInfo}
+                    </p>
+                  </div>
+                )}
               </div>
             </motion.div>
-          ))}
-        </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <div className="absolute right-0 z-30 pointer-events-auto">
+          <button
+            onClick={nextChapter}
+            className="p-2 sm:p-3 bg-[#2E1E1C]/80 hover:bg-[#8B2518] text-[#D4AF37] hover:text-white border border-[#D4AF37]/25 rounded-none shadow-md transition-all cursor-pointer"
+            title="다음 전시실"
+            aria-label="Next Chapter"
+          >
+            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </div>
       </div>
     </motion.div>
-  );
+
+    {/* Decorative Traditional Banner */}
+    <motion.div
+      variants={itemVariants}
+      className="relative bg-gradient-to-r from-[#1C1816] to-[#14110F] border border-[#D4AF37]/15 rounded-none p-6 shadow-sm overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left"
+    >
+      <div className="space-y-1">
+        <p className="text-lg font-serif text-[#F2ECE4] font-bold">
+          “역사는 흘러가 사라지는 과거의 낙엽이 아닙니다. 오늘날 우리의 마음을 비추는 거룩한 거울입니다.”
+        </p>
+      </div>
+      <div className="flex gap-4">
+        <button
+          onClick={() => navigate("/history")}
+          className="px-5 py-2.5 bg-[#D4AF37] hover:bg-[#BCA02B] text-neutral-900 text-xs font-serif font-black rounded-none transition-all shadow-sm cursor-pointer"
+        >
+          기록선 열람
+        </button>
+        <button
+          onClick={() => navigate("/folktales")}
+          className="px-5 py-2.5 border border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:bg-neutral-800 text-xs font-serif font-bold rounded-none transition-all cursor-pointer"
+        >
+          설화 비평
+        </button>
+      </div>
+    </motion.div>
+
+    {/* 2. Book List / Classical Cover Library Grid */}
+    <div className="space-y-8" id="home-book-covers-section">
+      <motion.div variants={itemVariants} className="text-center space-y-2">
+        <h3 className="text-xl sm:text-2xl font-serif font-black text-[#F5F2ED]">
+          보관각 서서 선집
+        </h3>
+        <p className="text-xs sm:text-sm text-[#D4AF37]/80 font-serif font-semibold">
+          대한의 소중한 기록 유산과 전승 목록이 보관되어 있습니다. 서고를 열고 지도 추적기를 구동해 주십시오.
+        </p>
+      </motion.div>
+
+      <motion.div 
+        variants={containerVariants}
+        className="grid grid-cols-1 md:grid-cols-3 gap-8 justify-items-center"
+      >
+        {books.map((book) => (
+          <motion.div
+            key={book.id}
+            variants={itemVariants}
+            whileHover={{ y: -4 }}
+            onClick={() => navigate(`/history/${book.id}`)}
+            className="w-full max-w-[280px] aspect-[3/4] rounded-none p-5 flex flex-col justify-between cursor-pointer relative shadow-md border-l-4 border-[#2C1A04] overflow-hidden group bg-gradient-to-br"
+            style={{
+              backgroundImage: "linear-gradient(135deg, #1E1B18 0%, #151210 100%)",
+              borderRight: "0.5px solid rgba(212, 175, 55, 0.15)",
+              borderTop: "0.5px solid rgba(212, 175, 55, 0.15)",
+              borderBottom: "0.5px solid rgba(212, 175, 55, 0.15)"
+            }}
+            id={`book-cover-${book.id}`}
+          >
+            <div className="absolute inset-y-0 left-0 w-[0.5px] bg-black/40" />
+            <div className="absolute inset-y-0 left-[2px] w-[0.5px] bg-neutral-800/20" />
+            
+            <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#D4AF37]/20 rounded-none" />
+            <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#D4AF37]/20 rounded-none" />
+
+            <div className="absolute left-[8px] inset-y-0 flex flex-col justify-between py-8 pointer-events-none">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="w-2.5 h-[1.5px] bg-[#D4AF37]/20 rounded-none border border-black/30" />
+              ))}
+            </div>
+
+            <div className="pl-6 pt-2 flex justify-between items-start">
+              <span className="text-[9px] uppercase tracking-widest font-sans text-[#D4AF37] font-bold border border-[#D4AF37]/15 px-1.5 py-0.5 rounded-none bg-[#251F1A]">
+                {book.dynasty}
+              </span>
+              <span className="text-[10px] text-neutral-400 font-bold flex items-center gap-1 font-serif">
+                {book.events?.length ?? 0}건 수록
+              </span>
+            </div>
+
+            <div className="flex justify-center my-6">
+              <div className="px-3.5 py-3.5 bg-[#161311] text-[#E8E3D9] border border-[#D4AF37]/15 rounded-none shadow-inner flex flex-col items-center gap-2 group-hover:bg-[#1C1815] transition-colors min-h-[160px] justify-center">
+                <h4 className="text-base sm:text-lg font-serif font-black tracking-wider text-center break-all [writing-mode:vertical-rl] leading-none text-[#F2ECE4]">
+                  {book.title.split(" (")[0]}
+                </h4>
+                <span className="text-[9px] text-[#D4AF37] border-t border-[#D4AF37]/15 pt-1.5 mt-1 font-serif font-bold">
+                  기록서
+                </span>
+              </div>
+            </div>
+
+            <div className="pl-6 pb-2 space-y-2">
+              <p className="text-[10px] text-neutral-400 line-clamp-2 font-serif group-hover:text-neutral-200 transition-colors font-medium">
+                {book.description
+                  .replace("이옵니다.", "입니다.")}
+              </p>
+              <div className="flex items-center gap-1 text-[10px] font-bold text-[#D4AF37] group-hover:text-[#F2ECE4] transition-all">
+                <span>지도에서 정밀 열람</span>
+                <span className="ml-1 group-hover:translate-x-1 transition-transform">→</span>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+    </div>
+
+    </motion.div>
+    );
+
 }

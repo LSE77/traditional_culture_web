@@ -671,14 +671,10 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                             </div>
                           </div>
                           <span className="text-xs font-mono text-[#D4AF37] bg-[#140403] px-2 py-1 border border-[#D4AF37]/20 flex-shrink-0">
-                            총 {events.length}건 기재식
+                            총 {events.length}건 수록
                           </span>
                         </div>
 
-                        {/* Detailed Description */}
-                        <p className="text-[11.5px] text-[#DEC5AC] leading-relaxed font-serif text-justify border-b border-[#D4AF37]/10 pb-3">
-                          <strong>서책 고찰:</strong> {currentBook?.description}
-                        </p>
 
                         {/* Grid of events inside this book */}
                         <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 custom-scrollbar">
@@ -708,7 +704,7 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
                                 </p>
                               </div>
                               <button className="flex-shrink-0 bg-[#310D0A] text-[#D4AF37] group-hover:bg-[#8B2518] group-hover:text-white px-3 py-1.5 border border-[#D4AF37]/30 group-hover:border-[#D4AF37] cursor-pointer text-[10px] font-serif transition-all">
-                                고지도 경로 분석 →
+                                지도 분석 보기 →
                               </button>
                             </div>
                           ))}
