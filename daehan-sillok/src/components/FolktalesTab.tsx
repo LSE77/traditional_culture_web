@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { MythicalCreature } from "../types";
 import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -169,16 +168,16 @@ export default function FolktalesTab() {
         if (error) throw error;
 
         if (!data || data.length === 0) {
-          // setCreatures(MYTHICAL_CREATURES as ExtendedCreature[]);
-          setDbError("Supabase에 설화 데이터가 없어.");
+          setCreatures([]);
+          setDbError("Supabase에 등록된 설화 자료가 없습니다.");
           return;
         }
 
         setCreatures(convertRowsToCreatures(data as MythicalCreatureRow[]));
       } catch (error) {
         console.error("Supabase mythical_creatures load failed:", error);
-        // setCreatures(MYTHICAL_CREATURES as ExtendedCreature[]);
-        setDbError("error");
+        setCreatures([]);
+        setDbError("Supabase 설화 데이터를 불러오지 못했습니다.");
       } finally {
         setIsLoadingDb(false);
       }

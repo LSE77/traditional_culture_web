@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { HistoricalBook } from "../types";
-import { HISTORICAL_BOOKS } from "../data/history/book";
+
 import { motion, AnimatePresence } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -106,7 +106,7 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
         }
 
         if (!bookRows || bookRows.length === 0) {
-          setBooks(HISTORICAL_BOOKS);
+          setBooks([]);
           return;
         }
 
@@ -141,7 +141,7 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
         setBooks(convertedBooks);
       } catch (error) {
         console.error("HomeTab historical books load failed:", error);
-        setBooks(HISTORICAL_BOOKS);
+        setBooks([]);
       } finally {
         setIsLoadingBooks(false);
       }

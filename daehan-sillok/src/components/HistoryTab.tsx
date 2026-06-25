@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { HistoricalBook, HistoricalEvent } from "../types";
-import { HISTORICAL_BOOKS } from "../data/history/book";
 import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -109,7 +108,7 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
   const [activeBookId, setActiveBookId] = useState<string>("");
 
   // History data source: Supabase first, data.ts fallback if DB is empty or unreachable
-  const [books, setBooks] = useState<HistoricalBook[]>([]);
+  const [books, setBooks] = useState<HistoricalBook[]>([]); //3번 수정사항
   const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
   const [dbError, setDbError] = useState<string>("");
   const navigate = useNavigate();
@@ -187,11 +186,8 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
         }
 
         if (!bookRows || bookRows.length === 0) {
-          setBooks(HISTORICAL_BOOKS);
-          if (convertedBooks.length > 0 && !activeBookId) {
-            setActiveBookId(convertedBooks[0].id);
-          }
-          setDbError("Supabase 테이블은 연결됐지만 아직 데이터가 없어 기존 data.ts 사료를 표시합니다.");
+          setBooks([]);
+          setDbError("Supabase에 등록된 역사 자료가 없습니다.");
           return;
         }
 
@@ -202,13 +198,11 @@ export default function HistoryTab({ onMapPlayerToggle }: HistoryTabProps) {
 
         setBooks(convertedBooks);
 
-        // if (!activeBookId && convertedBooks.length > 0) {
-        //   setActiveBookId(convertedBooks[0].id);
-        // }
+
       } catch (error) {
         console.error("Supabase history load failed:", error);
-        setBooks(HISTORICAL_BOOKS);
-        setDbError("Supabase 연결에 실패해서 기존 data.ts 사료를 표시합니다.");
+        setBooks([]);
+        setDbError("Supabase 역사 데이터를 불러오지 못했습니다.");
       } finally {
         setIsLoadingDb(false);
       }
