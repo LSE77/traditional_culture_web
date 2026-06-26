@@ -1,14 +1,11 @@
 import { Loader2 } from "lucide-react";
 import type { ClassicDateSelection, ClassicRecord } from "../types/classics";
-import type { HistoricalEvent } from "../types";
 
 type ClassicRecordViewerProps = {
-  currentEvent?: HistoricalEvent;
   selection: ClassicDateSelection;
   records: ClassicRecord[];
   selectedDataId?: string | null;
   isLoading: boolean;
-  sourceUrl?: string;
   error: string;
 };
 
@@ -39,7 +36,6 @@ const getRecordId = (record: ClassicRecord) => {
 };
 
 export default function ClassicRecordViewer({
-  currentEvent,
   selection,
   records,
   selectedDataId,
@@ -52,6 +48,15 @@ export default function ClassicRecordViewer({
   const selectedRecord =
     records.find((record) => getRecordId(record) === selectedDataId) ??
     records[0];
+
+  const detailLines = (
+    selectedRecord?.searchText ||
+    selectedRecord?.title ||
+    ""
+  )
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   return (
     <div className="border-t border-[#5C4033]/20 pt-3 space-y-3">
@@ -78,45 +83,38 @@ export default function ClassicRecordViewer({
         </div>
       )}
 
-      {!isLoading && !error && selectedRecord && (
+      {!isLoading && !error && selectedRecord && detailLines.length > 0 && (
         <ul className="space-y-1 text-xs text-[#3E352C] font-serif list-disc pl-4 leading-relaxed text-justify">
-          <li className="marker:text-[#8B0000]">
-            {selectedRecord.title || "제목 없음"}
-          </li>
+          {detailLines.map((line, index) => (
+            <li
+              key={`classic-detail-${index}`}
+              className="marker:text-[#8B0000]"
+            >
+              {line}
+            </li>
+          ))}
         </ul>
+      )}
+
+      {!isLoading && !error && selectedRecord && detailLines.length === 0 && (
+        <p className="text-xs text-[#3E352C] font-serif leading-relaxed">
+          원문 상세 내용이 아직 없습니다.
+        </p>
+      )}
+
+      {!isLoading && !error && !selectedRecord && hasSelection && (
+        <div className="min-h-[120px] flex items-center justify-center border border-[#8B0000]/10 bg-[#F7EFE2]/60 px-4 text-center">
+          <p className="text-xs font-serif text-[#6B4A32] leading-relaxed">
+            선택한 날짜에 해당하는 원문 기사가 없습니다.
+          </p>
+        </div>
       )}
 
       {!isLoading && !error && !selectedRecord && !hasSelection && (
-        <>
-          {currentEvent?.details && currentEvent.details.length > 0 ? (
-            <ul className="space-y-1 text-xs text-[#3E352C] font-serif list-disc pl-4 leading-relaxed text-justify">
-              {currentEvent.details.map((detail, index) => (
-                <li key={index} className="marker:text-[#8B0000]">
-                  {detail}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-[#3E352C] font-serif leading-relaxed">
-              사건 상세 내용이 아직 등록되지 않았습니다.
-            </p>
-          )}
-        </>
+        <p className="text-xs text-[#3E352C] font-serif leading-relaxed">
+          원문 기사를 선택하면 상세 내용이 표시됩니다.
+        </p>
       )}
-
-        {!isLoading && !error && selectedRecord && (
-        <ul className="space-y-1 text-xs text-[#3E352C] font-serif list-disc pl-4 leading-relaxed text-justify">
-            {(selectedRecord.searchText || selectedRecord.title || "제목 없음")
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean)
-            .map((line, index) => (
-                <li key={`classic-detail-${index}`} className="marker:text-[#8B0000]">
-                {line}
-                </li>
-            ))}
-        </ul>
-        )}
     </div>
   );
 }

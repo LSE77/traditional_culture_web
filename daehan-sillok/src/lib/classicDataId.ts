@@ -20,7 +20,7 @@ const normalizeKingName = (kingName: string) => {
     .trim();
 };
 
-const JOSEON_SILLOK_KING_CODES: Record<string, string> = {
+const ROYAL_RECORD_KING_CODES: Record<string, string> = {
   태조: "A0",
   정종: "B0",
   태종: "C0",
@@ -56,7 +56,18 @@ const JOSEON_SILLOK_KING_CODES: Record<string, string> = {
   순조: "W0",
   헌종: "X0",
   철종: "Y0",
+  고종: "Z0",
+  순종: "ZA",
 };
+
+const ILSEONGNOK_BRANCH_CODES: Record<string, string> = {
+  영조: "U0",
+  정조: "V0",
+  순조: "W0",
+  대청시일록: "W1",
+};
+
+const SUPPORTED_ROYAL_RECORD_ITEM_IDS = new Set(["JT", "ST", "IT"]);
 
 type FirstRecordDate = {
   reignYear: number;
@@ -146,6 +157,26 @@ const isBeforeFirstRecordDate = (
   return selection.day < firstRecordDate.day;
 };
 
+export const normalizeRoyalRecordKingName = normalizeKingName;
+
+export const makeRoyalRecordKingNodeId = (
+  itemId: string,
+  kingName: string
+) => {
+  const normalizedItemId = itemId.trim().toUpperCase();
+  const normalizedKingName = normalizeKingName(kingName);
+  const kingCode =
+    normalizedItemId === "IT"
+      ? ILSEONGNOK_BRANCH_CODES[normalizedKingName]
+      : ROYAL_RECORD_KING_CODES[normalizedKingName];
+
+  if (!SUPPORTED_ROYAL_RECORD_ITEM_IDS.has(normalizedItemId) || !kingCode) {
+    return null;
+  }
+
+  return `ITKC_${normalizedItemId}_${kingCode}`;
+};
+
 export const makeClassicDateNodeId = (selection: ClassicDateSelection) => {
   if (selection.collectionId !== "joseon-sillok") {
     return null;
@@ -161,7 +192,7 @@ export const makeClassicDateNodeId = (selection: ClassicDateSelection) => {
   }
 
   const kingName = normalizeKingName(selection.kingName);
-  const kingCode = JOSEON_SILLOK_KING_CODES[kingName];
+  const kingCode = ROYAL_RECORD_KING_CODES[kingName];
 
   if (!kingCode) {
     return null;
@@ -213,12 +244,5 @@ export const makeClassicDateNodeUrl = (selection: ClassicDateSelection) => {
 };
 
 export const makeClassicKingNodeId = (kingName: string) => {
-  const normalizedKingName = normalizeKingName(kingName);
-  const kingCode = JOSEON_SILLOK_KING_CODES[normalizedKingName];
-
-  if (!kingCode) {
-    return null;
-  }
-
-  return `ITKC_JT_${kingCode}`;
+  return makeRoyalRecordKingNodeId("JT", kingName);
 };

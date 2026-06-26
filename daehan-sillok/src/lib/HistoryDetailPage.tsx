@@ -7,8 +7,6 @@ type HistoricalBookRow = {
   title: string;
   dynasty: string;
   description: string;
-  cover_color?: string | null;
-  accent_color?: string | null;
   sort_order?: number | null;
 };
 

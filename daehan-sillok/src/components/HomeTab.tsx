@@ -89,20 +89,12 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
       try {
         const { data: bookRows, error: bookError } = await supabase
           .from("historical_books")
-          .select("*")
+          .select("id, title, dynasty, description, sort_order, is_active")
+          .eq("is_active", true)
           .order("sort_order", { ascending: true });
 
         if (bookError) {
           throw bookError;
-        }
-
-        const { data: eventRows, error: eventError } = await supabase
-          .from("historical_events")
-          .select("*")
-          .order("sort_order", { ascending: true });
-
-        if (eventError) {
-          throw eventError;
         }
 
         if (!bookRows || bookRows.length === 0) {
@@ -110,33 +102,14 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
           return;
         }
 
-        const convertedBooks: HistoricalBook[] = bookRows.map((book) => {
-          const events = (eventRows || [])
-            .filter((event) => event.book_id === book.id)
-            .map((event) => ({
-              id: event.id,
-              title: event.title,
-              year: event.year,
-              dateStr: event.date_str,
-              mapX: event.map_x,
-              mapY: event.map_y,
-              locationName: event.location_name,
-              description: event.description,
-              details: event.details || [],
-              category: event.category,
-              iconName: event.icon_name,
-            }));
-
-          return {
-            id: book.id,
-            title: book.title,
-            dynasty: book.dynasty,
-            description: book.description,
-            coverColor: book.cover_color || "from-[#471E19] to-[#250906]",
-            accentColor: book.accent_color || "#D4AF37",
-            events,
-          };
-        });
+        const convertedBooks: HistoricalBook[] = bookRows.map((book) => ({
+          id: book.id,
+          title: book.title,
+          dynasty: book.dynasty,
+          description: book.description,
+          sortOrder: book.sort_order ?? null,
+          isActive: book.is_active ?? true,
+        }));
 
         setBooks(convertedBooks);
       } catch (error) {
@@ -324,7 +297,7 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
                 {book.dynasty}
               </span>
               <span className="text-[10px] text-neutral-400 font-bold flex items-center gap-1 font-serif">
-                {book.events?.length ?? 0}건 수록
+                원문 탐색
               </span>
             </div>
 
@@ -345,7 +318,7 @@ export default function HomeTab({ onSelectBook, onNavigateToFolktales }: HomeTab
                   .replace("이옵니다.", "입니다.")}
               </p>
               <div className="flex items-center gap-1 text-[10px] font-bold text-[#D4AF37] group-hover:text-[#F2ECE4] transition-all">
-                <span>지도에서 정밀 열람</span>
+                <span>원문 탐색 열람</span>
                 <span className="ml-1 group-hover:translate-x-1 transition-transform">→</span>
               </div>
             </div>

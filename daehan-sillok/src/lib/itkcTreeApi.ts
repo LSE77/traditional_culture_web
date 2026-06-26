@@ -1,20 +1,31 @@
-import { parseItkcTreeHtml, type ClassicTreeNode } from "./itkcTreeParser";
+import {
+  parseItkcTreeHtml,
+  type ClassicTreeNode,
+} from "./itkcTreeParser";
 
 type FetchItkcTreeNodesParams = {
-  dataId: string;
-  depth: 1 | 2 | 3 | 4;
-  dataGubun: "서지" | "재위년" | "월" | "일";
+  itemId?: string;
+  dataId?: string;
+  depth: number;
+  dataGubun?: string;
+  cate1?: string;
+  cate2?: string;
 };
 
 export const fetchItkcTreeNodes = async ({
-  dataId,
+  itemId = "JT",
+  dataId = "",
   depth,
-  dataGubun,
+  dataGubun = "",
+  cate1 = "",
+  cate2 = "",
 }: FetchItkcTreeNodesParams): Promise<ClassicTreeNode[]> => {
   const params = new URLSearchParams({
-    itemId: "JT",
+    itemId,
     gubun: "book",
     depth: String(depth),
+    cate1,
+    cate2,
     dataGubun,
     dataId,
   });
@@ -23,11 +34,14 @@ export const fetchItkcTreeNodes = async ({
   const html = await response.text();
 
   if (!response.ok) {
-    console.error("ITKC treeAjax failed:", {
+    console.error("ITKC tree fetch failed:", {
       status: response.status,
+      itemId,
+      dataId,
+      depth,
+      dataGubun,
       html: html.slice(0, 500),
     });
-
     return [];
   }
 

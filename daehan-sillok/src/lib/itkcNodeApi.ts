@@ -4,18 +4,20 @@ import {
 } from "./itkcNodeParser";
 
 type FetchItkcNodeArticlesParams = {
+  itemId?: string;
   dataId: string;
-  depth: 4 | 5;
-  dataGubun: "일" | "최종정보";
+  depth: number;
+  dataGubun: string;
 };
 
 export const fetchItkcNodeArticles = async ({
+  itemId = "JT",
   dataId,
   depth,
   dataGubun,
 }: FetchItkcNodeArticlesParams): Promise<ItkcArticleDetail[]> => {
   const params = new URLSearchParams({
-    itemId: "JT",
+    itemId,
     gubun: "book",
     depth: String(depth),
     dataGubun,
@@ -28,9 +30,12 @@ export const fetchItkcNodeArticles = async ({
   if (!response.ok) {
     console.error("ITKC node fetch failed:", {
       status: response.status,
+      itemId,
+      dataId,
+      depth,
+      dataGubun,
       html: html.slice(0, 500),
     });
-
     return [];
   }
 

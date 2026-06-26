@@ -6,19 +6,26 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
+  LayoutGrid
 } from "lucide-react";
-import { CLASSIC_COLLECTIONS } from "../constants/classicCollections";
-import { makeClassicKingNodeId } from "../lib/classicDataId";
+import { makeRoyalRecordKingNodeId } from "../lib/classicDataId";
 import { fetchItkcTreeNodes } from "../lib/itkcTreeApi";
+import { fetchItkcNodeArticles } from "../lib/itkcNodeApi";
 import type { ClassicTreeNode } from "../lib/itkcTreeParser";
-import type { ClassicDateSelection } from "../types/classics";
+import type { ClassicDateSelection, ClassicRecord } from "../types/classics";
 
 type ClassicArchiveBrowserProps = {
   collectionId?: string;
+  itemId?: string;
+  archiveLabel?: string;
+  title?: string;
+  onBackToLibrary?: () => void;
   onSelectDate: (selection: ClassicDateSelection) => void;
+  onSelectRecord?: (record: ClassicRecord) => void;
+  onSelectRecords?: (records: ClassicRecord[], label: string) => void;
 };
 
-const JOSEON_KINGS = [
+export const JOSEON_KINGS = [
   { id: "taejo", name: "태조" },
   { id: "jeongjong", name: "정종" },
   { id: "taejong", name: "태종" },
@@ -49,6 +56,36 @@ const JOSEON_KINGS = [
   { id: "heonjong", name: "헌종" },
   { id: "cheoljong", name: "철종" },
 ];
+
+const ILSEONGNOK_INTRO_BRANCHES = [
+  { id: "ilseongnok-beomrye", name: "일성록범례", dataId: "ITKC_IT_01" },
+  { id: "ilseongnok-seo", name: "일성록 서", dataId: "ITKC_IT_02" },
+];
+
+const ILSEONGNOK_DATE_BRANCHES = [
+  { id: "yeongjo", name: "영조" },
+  { id: "jeongjo", name: "정조" },
+  { id: "sunjo", name: "순조" },
+  { id: "daechungsi-ilrok", name: "대청시일록" },
+];
+
+const SEUNGJEONGWON_ACCESSIBLE_KINGS = [
+  { id: "injo", name: "인조" },
+  { id: "yeongjo", name: "영조" },
+  { id: "gojong", name: "고종" },
+  { id: "sunjong", name: "순종" },
+];
+
+export const ROYAL_RECORD_KINGS_BY_ITEM_ID = {
+  JT: JOSEON_KINGS,
+  ST: SEUNGJEONGWON_ACCESSIBLE_KINGS,
+  IT: ILSEONGNOK_DATE_BRANCHES,
+};
+
+export const getRoyalRecordKingOptions = (itemId = "JT") => {
+  const normalizedItemId = itemId.trim().toUpperCase() as keyof typeof ROYAL_RECORD_KINGS_BY_ITEM_ID;
+  return ROYAL_RECORD_KINGS_BY_ITEM_ID[normalizedItemId] ?? JOSEON_KINGS;
+};
 
 const getNumberParam = (searchParams: URLSearchParams, key: string) => {
   const value = searchParams.get(key);
@@ -110,17 +147,27 @@ const getDayFromNode = (node: ClassicTreeNode) => {
 
 export default function ClassicArchiveBrowser({
   collectionId = "joseon-sillok",
+  itemId = "JT",
+  archiveLabel = "조선왕조실록",
+  title,
+  onBackToLibrary,
   onSelectDate,
+  onSelectRecord,
+  onSelectRecords,
 }: ClassicArchiveBrowserProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const hasAutoSearchedRef = useRef(false);
 
-  const collection = useMemo(
-    () =>
-      CLASSIC_COLLECTIONS.find((item) => item.id === collectionId) ??
-      CLASSIC_COLLECTIONS[0],
-    [collectionId]
-  );
+  const normalizedItemId = itemId.trim().toUpperCase();
+  const kingOptions = useMemo(() => {
+    return getRoyalRecordKingOptions(normalizedItemId);
+  }, [normalizedItemId]);
+  const isIlseongnok = normalizedItemId === "IT";
+  const [selectedIntroBranch, setSelectedIntroBranch] = useState<
+    (typeof ILSEONGNOK_INTRO_BRANCHES)[number] | null
+  >(null);
+  const [introBranchNodes, setIntroBranchNodes] = useState<ClassicTreeNode[]>([]);
+  const [isLoadingIntroBranch, setIsLoadingIntroBranch] = useState(false);
 
   const initialKingName = searchParams.get("king") ?? "";
   const initialReignYear = getNumberParam(searchParams, "reignYear");
@@ -138,6 +185,12 @@ export default function ClassicArchiveBrowser({
   const [selectedDay, setSelectedDay] = useState<number | null>(initialDay);
   const [isLeapMonth, setIsLeapMonth] = useState(initialIsLeapMonth);
 
+  const [isKingPickerOpen, setIsKingPickerOpen] = useState(!initialKingName);
+  const [isYearPickerOpen, setIsYearPickerOpen] = useState(!initialReignYear);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(!initialMonth);
+  const [isDayPickerOpen, setIsDayPickerOpen] = useState(!initialDay);
+
+
   const [yearNodes, setYearNodes] = useState<ClassicTreeNode[]>([]);
   const [monthNodes, setMonthNodes] = useState<ClassicTreeNode[]>([]);
   const [dayNodes, setDayNodes] = useState<ClassicTreeNode[]>([]);
@@ -147,7 +200,7 @@ export default function ClassicArchiveBrowser({
   const [isLoadingDays, setIsLoadingDays] = useState(false);
   const [treeError, setTreeError] = useState("");
 
-  const selectedKing = JOSEON_KINGS.find(
+  const selectedKing = kingOptions.find(
     (king) => king.name === selectedKingName
   );
 
@@ -162,10 +215,29 @@ export default function ClassicArchiveBrowser({
     );
   });
 
+  const selectedDayNode = dayNodes.find((node) => {
+    return getDayFromNode(node) === selectedDay;
+  });
+
+  const selectedKingLabel = selectedKingName || "왕대 선택";
+  const selectedYearLabel =
+    selectedYearNode?.label ||
+    (selectedReignYear ? `${selectedReignYear}년` : "재위년 선택");
+
+  const selectedMonthLabel =
+    selectedMonthNode?.label ||
+    (selectedMonth
+      ? `${isLeapMonth ? "윤" : ""}${selectedMonth}월`
+      : "월 선택");
+
+  const selectedDayLabel =
+    selectedDayNode?.label || (selectedDay ? `${selectedDay}일` : "일자 선택");
+
+
   const updateClassicSearchParams = (next: Partial<ClassicDateSelection>) => {
     const params = new URLSearchParams(searchParams);
 
-    params.set("source", collection.id);
+    params.set("source", collectionId);
 
     if (next.kingName !== undefined) {
       next.kingName ? params.set("king", next.kingName) : params.delete("king");
@@ -194,7 +266,149 @@ export default function ClassicArchiveBrowser({
     setSearchParams(params, { replace: true });
   };
 
+  const makeIntroBranchNodeUrl = (node: ClassicTreeNode) => {
+    const params = new URLSearchParams({
+      grpId: "",
+      itemId: normalizedItemId,
+      gubun: "book",
+      depth: String(node.depth || 2),
+      cate1: "",
+      cate2: "",
+      dataGubun: node.dataGubun || "최종정보",
+      dataId: node.dataId,
+    });
+
+    return `https://db.itkc.or.kr/dir/node?${params.toString()}`;
+  };
+
+  const createIntroRecordFromNode = async (
+    node: ClassicTreeNode,
+    branch: (typeof ILSEONGNOK_INTRO_BRANCHES)[number]
+  ): Promise<ClassicRecord> => {
+    const details = await fetchItkcNodeArticles({
+      itemId: normalizedItemId,
+      dataId: node.dataId,
+      depth: node.depth || 2,
+      dataGubun: node.dataGubun || "최종정보",
+    });
+
+    const detail = details[0];
+
+    return {
+      id: detail?.dataId || node.dataId,
+      dataId: detail?.dataId || node.dataId,
+      dci: detail?.dataId || node.dataId,
+      title: detail?.title || node.label || "일성록 본문",
+      bookTitle: branch.name,
+      volumeTitle: branch.name,
+      category: archiveLabel,
+      itemId: normalizedItemId,
+      searchText: detail?.bodyText || node.label || "본문 정보가 없습니다.",
+      sourceUrl: makeIntroBranchNodeUrl(node),
+      raw: {
+        dataId: detail?.dataId || node.dataId,
+        node,
+        detail,
+        introBranch: branch,
+      },
+    };
+  };
+
+  const handleSelectIntroBranch = async (
+    branch: (typeof ILSEONGNOK_INTRO_BRANCHES)[number]
+  ) => {
+    setSelectedIntroBranch(branch);
+    setIntroBranchNodes([]);
+    setSelectedKingName("");
+    setSelectedReignYear(null);
+    setSelectedMonth(null);
+    setSelectedDay(null);
+    setIsLeapMonth(false);
+    setYearNodes([]);
+    setMonthNodes([]);
+    setDayNodes([]);
+    setTreeError("");
+    setIsKingPickerOpen(false);
+    setIsYearPickerOpen(false);
+    setIsMonthPickerOpen(false);
+    setIsDayPickerOpen(false);
+    setIsLoadingIntroBranch(true);
+
+    try {
+      const nodes = await fetchItkcTreeNodes({
+        itemId: normalizedItemId,
+        dataId: branch.dataId,
+        depth: 1,
+        dataGubun: "서지",
+      });
+
+      setIntroBranchNodes(nodes);
+
+      const records = await Promise.all(
+        nodes.map((node) => createIntroRecordFromNode(node, branch))
+      );
+
+      onSelectRecords?.(records, branch.name);
+    } catch (error) {
+      console.error("일성록 서문/범례 목록 로드 실패:", error);
+      setIntroBranchNodes([]);
+      setTreeError("일성록 서문·범례 항목을 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingIntroBranch(false);
+    }
+  };
+
+  const handleSelectIntroNode = async (node: ClassicTreeNode) => {
+    if (!onSelectRecord) {
+      setTreeError("이 항목을 표시할 상세 화면이 아직 연결되지 않았습니다.");
+      return;
+    }
+
+    setTreeError("");
+    setIsLoadingIntroBranch(true);
+
+    try {
+      const details = await fetchItkcNodeArticles({
+        itemId: normalizedItemId,
+        dataId: node.dataId,
+        depth: node.depth || 2,
+        dataGubun: node.dataGubun || "최종정보",
+      });
+
+      const detail = details[0];
+
+      const record: ClassicRecord = {
+        id: detail?.dataId || node.dataId,
+        dataId: detail?.dataId || node.dataId,
+        dci: detail?.dataId || node.dataId,
+        title: detail?.title || node.label || "일성록 본문",
+        bookTitle: selectedIntroBranch?.name || archiveLabel,
+        volumeTitle: selectedIntroBranch?.name || archiveLabel,
+        category: archiveLabel,
+        itemId: normalizedItemId,
+        searchText: detail?.bodyText || node.label || "본문 정보가 없습니다.",
+        sourceUrl: makeIntroBranchNodeUrl(node),
+        raw: {
+          dataId: detail?.dataId || node.dataId,
+          node,
+          detail,
+          introBranch: selectedIntroBranch,
+        },
+      };
+
+      onSelectRecord(record);
+    } catch (error) {
+      console.error("일성록 서문/범례 본문 로드 실패:", error);
+      setTreeError("선택한 일성록 항목의 본문을 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingIntroBranch(false);
+    }
+  };
+
   const handleSelectKing = (kingName: string) => {
+    setSelectedIntroBranch(null);
+    setIntroBranchNodes([]);
+    onSelectRecords?.([], "");
     setSelectedKingName(kingName);
     setSelectedReignYear(null);
     setSelectedMonth(null);
@@ -204,6 +418,11 @@ export default function ClassicArchiveBrowser({
     setMonthNodes([]);
     setDayNodes([]);
     setTreeError("");
+
+    setIsKingPickerOpen(false);
+    setIsYearPickerOpen(true);
+    setIsMonthPickerOpen(false);
+    setIsDayPickerOpen(false);
 
     updateClassicSearchParams({
       kingName,
@@ -228,6 +447,11 @@ export default function ClassicArchiveBrowser({
     setMonthNodes([]);
     setDayNodes([]);
     setTreeError("");
+    
+    setIsYearPickerOpen(false);
+    setIsMonthPickerOpen(true);
+    setIsDayPickerOpen(false);
+
 
     updateClassicSearchParams({
       reignYear,
@@ -251,6 +475,9 @@ export default function ClassicArchiveBrowser({
     setDayNodes([]);
     setTreeError("");
 
+    setIsMonthPickerOpen(false);
+    setIsDayPickerOpen(true);
+
     updateClassicSearchParams({
       month,
       day: null,
@@ -258,12 +485,12 @@ export default function ClassicArchiveBrowser({
     });
   };
 
-const makeItkcNodeUrl = (node: ClassicTreeNode) => {
-  const url = node.url.startsWith("?") ? node.url : `?${node.url}`;
-  return `https://db.itkc.or.kr/dir/node${url}`;
-};
+  const makeItkcNodeUrl = (node: ClassicTreeNode) => {
+    const url = node.url.startsWith("?") ? node.url : `?${node.url}`;
+    return `https://db.itkc.or.kr/dir/node${url}`;
+  };
 
-    const handleSelectDay = (node: ClassicTreeNode) => {
+  const handleSelectDay = (node: ClassicTreeNode) => {
     const day = getDayFromNode(node);
 
     if (!selectedKingName || !selectedReignYear || !selectedMonth || !day) {
@@ -271,9 +498,10 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
     }
 
     setSelectedDay(day);
+      setIsDayPickerOpen(false);
 
     const selection: ClassicDateSelection = {
-        collectionId: collection.id,
+        collectionId,
         kingName: selectedKingName,
         reignYear: selectedReignYear,
         month: selectedMonth,
@@ -286,7 +514,7 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
 
     updateClassicSearchParams(selection);
     onSelectDate(selection);
-    };
+  };
 
   useEffect(() => {
     const loadYearNodes = async () => {
@@ -295,11 +523,11 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
         return;
       }
 
-      const kingNodeId = makeClassicKingNodeId(selectedKingName);
+      const kingNodeId = makeRoyalRecordKingNodeId(normalizedItemId, selectedKingName);
 
       if (!kingNodeId) {
         setYearNodes([]);
-        setTreeError("해당 왕대의 실록 코드가 등록되지 않았습니다.");
+        setTreeError(`${archiveLabel}에서 해당 왕대 코드를 찾지 못했습니다.`);
         return;
       }
 
@@ -308,6 +536,7 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
 
       try {
         const nodes = await fetchItkcTreeNodes({
+          itemId: normalizedItemId,
           dataId: kingNodeId,
           depth: 1,
           dataGubun: "서지",
@@ -338,6 +567,7 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
 
       try {
         const nodes = await fetchItkcTreeNodes({
+          itemId: normalizedItemId,
           dataId: selectedYearNode.dataId,
           depth: 2,
           dataGubun: "재위년",
@@ -368,6 +598,7 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
 
       try {
         const nodes = await fetchItkcTreeNodes({
+          itemId: normalizedItemId,
           dataId: selectedMonthNode.dataId,
           depth: 3,
           dataGubun: "월",
@@ -401,9 +632,9 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
       return;
     }
 
-    const matchedDayNode = dayNodes.find(
-      (node) => getDayFromNode(node) === initialDay
-    );
+    const matchedDayNode = dayNodes.find((node) => {
+      return getDayFromNode(node) === initialDay;
+    });
 
     if (!matchedDayNode) {
       return;
@@ -412,15 +643,19 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
     hasAutoSearchedRef.current = true;
 
     onSelectDate({
-      collectionId: collection.id,
+      collectionId,
       kingName: initialKingName,
       reignYear: initialReignYear,
       month: initialMonth,
       day: initialDay,
       isLeapMonth: initialIsLeapMonth,
+      dateNodeId: matchedDayNode.dataId,
+      dateNodeLabel: matchedDayNode.label,
+      dateNodeUrl: makeItkcNodeUrl(matchedDayNode),
     });
   }, [
-    collection.id,
+    collectionId,
+    normalizedItemId,
     dayNodes,
     initialKingName,
     initialReignYear,
@@ -430,173 +665,255 @@ const makeItkcNodeUrl = (node: ClassicTreeNode) => {
     onSelectDate,
   ]);
 
-  if (collection.browseType !== "king-date") {
-    return (
-      <div className="h-full bg-[#2A0A07] border border-[#D4AF37]/20 p-4 space-y-4">
-        <div className="flex items-center gap-2 text-[#D4AF37] font-serif font-black text-xs">
-          <BookOpen className="w-4 h-4" />
-          <span>{collection.label} 원문 탐색</span>
-        </div>
-
-        <div className="min-h-[220px] flex items-center justify-center border border-[#D4AF37]/10 bg-[#1E0402]/70 px-4 text-center">
-          <p className="text-xs font-serif text-[#DEC5AC] leading-relaxed">
-            이 자료집의 폴더 탐색 구조는 아직 준비되지 않았습니다.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-full bg-[#2A0A07] border border-[#D4AF37]/20 p-4 space-y-4">
-      <div className="flex items-center justify-between gap-2 border-b border-[#D4AF37]/20 pb-3">
-        <div className="flex items-center gap-2 text-[#D4AF37] font-serif font-black text-xs">
-          <BookOpen className="w-4 h-4" />
-          <span>{collection.label} 원문 탐색</span>
+    <div className="h-full bg-[#2A0A07] border border-[#D4AF37]/20 p-4 space-y-4 overflow-hidden flex flex-col">
+      <div className="flex items-center justify-between gap-2 border-b border-[#D4AF37]/20 pb-3 flex-shrink-0">
+        <div className="flex items-center gap-2 text-[#D4AF37] font-serif font-black text-xs min-w-0">
+          <BookOpen className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">
+            {title || `${archiveLabel} 원문 탐색`}
+          </span>
         </div>
 
-        <span className="text-[10px] text-[#D4AF37]/60 font-mono">
-          {collection.itemId}
-        </span>
+        {onBackToLibrary && (
+          <button
+            type="button"
+            onClick={onBackToLibrary}
+            className="px-2.5 py-1 bg-[#4E1712] hover:bg-[#8B2518] text-[#D4AF37] hover:text-white text-[10px] font-serif border border-[#D4AF37]/40 cursor-pointer flex items-center gap-1 transition-all flex-shrink-0"
+          >
+            <LayoutGrid className="w-3 h-3" />
+            <span>[서서도첩]</span>
+          </button>
+        )}
       </div>
 
       {treeError && (
-        <div className="border border-red-900/40 bg-red-950/25 px-3 py-2 text-[10px] text-red-200 font-serif leading-relaxed">
+        <div className="border border-red-900/40 bg-red-950/25 px-3 py-2 text-[10px] text-red-200 font-serif leading-relaxed flex-shrink-0">
           {treeError}
         </div>
       )}
 
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-serif font-black text-[#D4AF37]">
-            {selectedKingName ? (
-              <FolderOpen className="w-3.5 h-3.5" />
-            ) : (
-              <Folder className="w-3.5 h-3.5" />
-            )}
-            <span>왕대 선택</span>
-          </div>
+      <div className="space-y-3 min-h-0 flex-1 overflow-y-auto scrollbar-hide pr-1">
+        {isIlseongnok && (
+          <div className="space-y-2">
+            <span className="text-[10px] text-[#D4AF37] font-serif font-black tracking-widest uppercase">
+              서문 · 범례
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ILSEONGNOK_INTRO_BRANCHES.map((branch) => (
+                <button
+                  key={branch.id}
+                  type="button"
+                  onClick={() => handleSelectIntroBranch(branch)}
+                  className={`px-2 py-1.5 text-[11px] font-serif border text-left transition-all rounded-none ${
+                    selectedIntroBranch?.id === branch.id
+                      ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
+                      : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+                  }`}
+                >
+                  {branch.name}
+                </button>
+              ))}
+            </div>
 
-          <div className="grid grid-cols-2 gap-1.5 max-h-[160px] overflow-y-auto scrollbar-hide pr-1">
-            {JOSEON_KINGS.map((king) => (
-              <button
-                key={king.id}
-                onClick={() => handleSelectKing(king.name)}
-                className={`px-2 py-1.5 text-[11px] font-serif border text-left transition-all rounded-none ${
-                  selectedKingName === king.name
-                    ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
-                    : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
-                }`}
-              >
-                {king.name}
-              </button>
-            ))}
+            {isLoadingIntroBranch && (
+              <p className="text-[10px] text-[#DEC5AC] font-serif">
+                일성록 서문·범례 항목을 불러오는 중...
+              </p>
+            )}
+
+            {introBranchNodes.length > 0 && (
+              <div className="border border-[#D4AF37]/15 bg-[#1E0402] px-3 py-2 text-[10px] text-[#DEC5AC] font-serif leading-relaxed">
+                {selectedIntroBranch?.name}의 원문 항목 {introBranchNodes.length}건을 오른쪽 원문 탐색 영역에 펼쳤습니다.
+              </div>
+            )}
           </div>
+        )}
+
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setIsKingPickerOpen((prev) => !prev)}
+            className="w-full flex items-center justify-between gap-2 text-[10px] font-serif font-black text-[#D4AF37] bg-[#1E0402] border border-[#D4AF37]/15 px-2 py-2 hover:border-[#D4AF37]/60 transition-all"
+          >
+            <span className="flex items-center gap-1.5">
+              {selectedKingName ? (
+                <FolderOpen className="w-3.5 h-3.5" />
+              ) : (
+                <Folder className="w-3.5 h-3.5" />
+              )}
+              {isIlseongnok ? "날짜 기록 선택" : "왕대 선택"}
+            </span>
+
+            <span className="text-[#DEC5AC] truncate max-w-[140px]">
+              {selectedKingLabel}
+            </span>
+          </button>
+
+          {isKingPickerOpen && (
+            <div className="grid grid-cols-2 gap-1.5 max-h-[460px] overflow-y-auto scrollbar-hide pr-1">
+              {kingOptions.map((king) => (
+                <button
+                  key={king.id}
+                  onClick={() => handleSelectKing(king.name)}
+                  className={`px-2 py-1.5 text-[11px] font-serif border text-left transition-all rounded-none ${
+                    selectedKingName === king.name
+                      ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
+                      : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+                  }`}
+                >
+                  {king.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {selectedKing && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-serif font-black text-[#D4AF37]">
-              <ChevronRight className="w-3.5 h-3.5" />
-              <span>재위년 선택</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsYearPickerOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between gap-2 text-[10px] font-serif font-black text-[#D4AF37] bg-[#1E0402] border border-[#D4AF37]/15 px-2 py-2 hover:border-[#D4AF37]/60 transition-all"
+            >
+              <span className="flex items-center gap-1.5">
+                <ChevronRight className="w-3.5 h-3.5" />
+                재위년 선택
+              </span>
 
-            {isLoadingYears ? (
-              <p className="text-[10px] text-[#DEC5AC] font-serif">
-                재위년 목록을 불러오는 중...
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-1.5 max-h-[120px] overflow-y-auto scrollbar-hide pr-1">
-                {yearNodes.map((node) => {
-                  const reignYear = getReignYearFromNode(node);
+              <span className="text-[#DEC5AC] truncate max-w-[140px]">
+                {selectedYearLabel}
+              </span>
+            </button>
 
-                  return (
-                    <button
-                      key={node.dataId}
-                      onClick={() => handleSelectYear(node)}
-                      className={`px-2 py-1.5 text-[11px] font-serif border text-center transition-all rounded-none ${
-                        selectedReignYear === reignYear
-                          ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
-                          : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
-                      }`}
-                    >
-                      {node.label}
-                    </button>
-                  );
-                })}
-              </div>
+            {isYearPickerOpen && (
+              <>
+                {isLoadingYears ? (
+                  <p className="text-[10px] text-[#DEC5AC] font-serif">
+                    재위년 목록을 불러오는 중...
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1.5 max-h-[420px] overflow-y-auto scrollbar-hide pr-1">
+                    {yearNodes.map((node) => {
+                      const reignYear = getReignYearFromNode(node);
+
+                      return (
+                        <button
+                          key={node.dataId}
+                          onClick={() => handleSelectYear(node)}
+                          className={`px-2 py-1.5 text-[11px] font-serif border text-center transition-all rounded-none ${
+                            selectedReignYear === reignYear
+                              ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
+                              : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+                          }`}
+                        >
+                          {node.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
 
         {selectedReignYear && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-serif font-black text-[#D4AF37]">
-              <ChevronRight className="w-3.5 h-3.5" />
-              <span>월 선택</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsMonthPickerOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between gap-2 text-[10px] font-serif font-black text-[#D4AF37] bg-[#1E0402] border border-[#D4AF37]/15 px-2 py-2 hover:border-[#D4AF37]/60 transition-all"
+            >
+              <span className="flex items-center gap-1.5">
+                <ChevronRight className="w-3.5 h-3.5" />
+                월 선택
+              </span>
 
-            {isLoadingMonths ? (
-              <p className="text-[10px] text-[#DEC5AC] font-serif">
-                월 목록을 불러오는 중...
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-1.5">
-                {monthNodes.map((node) => {
-                  const month = getMonthFromNode(node);
-                  const nodeIsLeapMonth = getIsLeapMonthFromNode(node);
+              <span className="text-[#DEC5AC] truncate max-w-[140px]">
+                {selectedMonthLabel}
+              </span>
+            </button>
 
-                  return (
-                    <button
-                      key={node.dataId}
-                      onClick={() => handleSelectMonth(node)}
-                      className={`px-2 py-1.5 text-[11px] font-serif border text-center transition-all rounded-none ${
-                        selectedMonth === month &&
-                        isLeapMonth === nodeIsLeapMonth
-                          ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
-                          : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
-                      }`}
-                    >
-                      {node.label}
-                    </button>
-                  );
-                })}
-              </div>
+            {isMonthPickerOpen && (
+              <>
+                {isLoadingMonths ? (
+                  <p className="text-[10px] text-[#DEC5AC] font-serif">
+                    월 목록을 불러오는 중...
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-1.5 max-h-[220px] overflow-y-auto scrollbar-hide pr-1">
+                    {monthNodes.map((node) => {
+                      const month = getMonthFromNode(node);
+                      const nodeIsLeapMonth = getIsLeapMonthFromNode(node);
+
+                      return (
+                        <button
+                          key={node.dataId}
+                          onClick={() => handleSelectMonth(node)}
+                          className={`px-2 py-1.5 text-[11px] font-serif border text-center transition-all rounded-none ${
+                            selectedMonth === month &&
+                            isLeapMonth === nodeIsLeapMonth
+                              ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
+                              : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:text-[#D4AF37]"
+                          }`}
+                        >
+                          {node.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
 
         {selectedMonth && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-serif font-black text-[#D4AF37]">
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>일자 선택</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsDayPickerOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between gap-2 text-[10px] font-serif font-black text-[#D4AF37] bg-[#1E0402] border border-[#D4AF37]/15 px-2 py-2 hover:border-[#D4AF37]/60 transition-all"
+            >
+              <span className="flex items-center gap-1.5">
+                <CalendarDays className="w-3.5 h-3.5" />
+                일자 선택
+              </span>
 
-            {isLoadingDays ? (
-              <p className="text-[10px] text-[#DEC5AC] font-serif">
-                일자 목록을 불러오는 중...
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-1 max-h-[150px] overflow-y-auto scrollbar-hide pr-1">
-                {dayNodes.map((node) => {
-                  const day = getDayFromNode(node);
+              <span className="text-[#DEC5AC] truncate max-w-[140px]">
+                {selectedDayLabel}
+              </span>
+            </button>
 
-                  return (
-                    <button
-                      key={node.dataId}
-                      onClick={() => handleSelectDay(node)}
-                      className={`px-1 py-1.5 text-[10px] font-serif border text-center transition-all rounded-none ${
-                        selectedDay === day
-                          ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
-                          : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:bg-[#D4AF37] hover:text-[#1E0402] hover:font-black"
-                      }`}
-                    >
-                      {node.label}
-                    </button>
-                  );
-                })}
-              </div>
+            {isDayPickerOpen && (
+              <>
+                {isLoadingDays ? (
+                  <p className="text-[10px] text-[#DEC5AC] font-serif">
+                    일자 목록을 불러오는 중...
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-1 max-h-[340px] overflow-y-auto scrollbar-hide pr-1">
+                    {dayNodes.map((node) => {
+                      const day = getDayFromNode(node);
+
+                      return (
+                        <button
+                          key={node.dataId}
+                          onClick={() => handleSelectDay(node)}
+                          className={`px-1 py-1.5 text-[10px] font-serif border text-center transition-all rounded-none ${
+                            selectedDay === day
+                              ? "bg-[#D4AF37] text-[#1E0402] border-[#D4AF37] font-black"
+                              : "bg-[#1E0402] text-[#DEC5AC] border-[#D4AF37]/15 hover:border-[#D4AF37]/60 hover:bg-[#D4AF37] hover:text-[#1E0402] hover:font-black"
+                          }`}
+                        >
+                          {node.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

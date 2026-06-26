@@ -92,20 +92,22 @@ export default function Header() {
             <button
               key={tab.id}
               id={`tab-btn-${tab.id}`}
-              onClick={() => navigate(tab.path)}
+              onClick={() => {
+                if (tab.id === "history") {
+                  window.dispatchEvent(new Event("reset-history-tab"));
+                }
+
+                navigate(tab.path);
+              }}
               className={`relative px-3.5 py-1.5 sm:px-5 sm:py-2 text-xs sm:text-sm font-serif font-bold transition-all duration-300 flex items-center rounded-none cursor-pointer border border-transparent ${
-                isActive
-                  ? styles.tabTextActive
-                  : styles.tabTextInactive
+                isActive ? styles.tabTextActive : styles.tabTextInactive
               }`}
             >
               {isActive && (
                 <motion.div
                   layoutId="active-tab-glow"
                   className={`absolute inset-0 border border-transparent rounded-none ${
-                    activeTab === "folktales"
-                      ? "bg-[#00CDAC]"
-                      : "bg-[#D4AF37]"
+                    activeTab === "folktales" ? "bg-[#00CDAC]" : "bg-[#D4AF37]"
                   }`}
                   transition={{
                     type: "spring",
